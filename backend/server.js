@@ -243,3 +243,58 @@ app.post('/api/auth/create-user', async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+
+// --- PARTNERSHIP ENQUIRY SCHEMA & ROUTE ---
+const partnershipEnquirySchema = new mongoose.Schema({
+  fullName: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, required: true },
+  roleType: { type: String, required: true }, // 'Super Stockist' or 'Distributor'
+  location: { type: String, required: true },
+  message: { type: String },
+  createdAt: { type: Date, default: Date.now }
+});
+const PartnershipEnquiry = mongoose.model('PartnershipEnquiry', partnershipEnquirySchema);
+
+app.post('/api/partnership/enquiry', async (req, res) => {
+  try {
+    const { fullName, email, phone, roleType, location, message } = req.body;
+    
+    // Save to MongoDB
+    const newEnquiry = await PartnershipEnquiry.create({
+      fullName, email, phone, roleType, location, message
+    });
+
+    // Send notification email via Brevo to official inbox
+    const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+    apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+    sendSmtpEmail.sender = { email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', name: "Xllent Foods Portal" };
+    sendSmtpEmail.to = [{ email: 'xllentfoods91@gmail.com', name: "Xllent Admin" }];
+    sendSmtpEmail.subject = `New Partnership Enquiry: ${roleType} - ${fullName}`;
+    sendSmtpEmail.htmlContent = `
+      <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
+        <h2 style="color: #d97706; text-align: center;">New Partnership Application</h2>
+        <p>You have received a new partnership application on the Xllent Foods platform:</p>
+        <ul style="line-height: 1.6; font-size: 14px;">
+          <li><b>Full Name:</b> ${fullName}</li>
+          <li><b>Email:</b> ${email}</li>
+          <li><b>Phone:</b> ${phone}</li>
+          <li><b>Applying For:</b> ${roleType}</li>
+          <li><b>Target Location:</b> ${location}</li>
+          <li><b>Message:</b> ${message || 'N/A'}</li>
+        </ul>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #64748b; text-align: center;">Xllent Foods B2B Automated Notification</p>
+      </div>
+    `;
+
+    await apiInstance.sendTransacEmail(sendSmtpEmail);
+
+    res.status(201).json({ message: 'Partnership enquiry submitted successfully! Our team will contact you shortly.' });
+  } catch (err) {
+    console.error('Enquiry Error:', err);
+    res.status(500).json({ message: 'Failed to submit enquiry. Please try again later.' });
+  }
+});
