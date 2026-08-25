@@ -1,105 +1,179 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ArrowRight, PackageCheck, Sparkles } from 'lucide-react';
+import Navbar from '@/app/components/Navbar';
+import Footer from '@/app/components/Footer';
+import { ShieldCheck, TrendingUp, Users, ArrowRight, Package, CheckCircle2 } from 'lucide-react';
 
-interface Product {
-  _id: string;
-  name: string;
-  category: string;
-  sku: string;
-  mrp: number;
-  status: string;
-}
+const SLIDER_IMAGES = [
+  '/images/slider-1.jpg',
+  '/images/slider-2.jpg',
+  '/images/slider-3.jpg',  
+  '/images/slider-4.jpg'
+];
 
-export default function PublicCataloguePage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+export default function PublicHomePage() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [products, setProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    API.get('/products/public')
-      .then((res) => {
-        setProducts(res.data.products || []);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Failed to load catalogue", err);
-        setLoading(false);
-      });
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % SLIDER_IMAGES.length);
+    }, 4000);
+    return () => clearInterval(timer);
   }, []);
 
-  return (
-    <div className="min-h-screen bg-slate-50 text-slate-800">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="bg-amber-600 text-white p-2 rounded-xl font-black tracking-wider text-lg">X</span>
-            <h1 className="text-xl font-extrabold tracking-tight text-slate-900">XLLENT FOOD PRODUCTS</h1>
-          </div>
-          <a href="/login" className="px-5 py-2.5 text-sm font-semibold bg-amber-600 text-white rounded-xl hover:bg-amber-700 transition flex items-center gap-2 shadow-sm">
-            <span>Partner Portal Login</span>
-            <ArrowRight className="w-4 h-4" />
-          </a>
-        </div>
-      </header>
+  useEffect(() => {
+    fetchPublicProducts();
+  }, []);
 
-      <section className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white py-20 px-6 text-center shadow-inner">
-        <div className="max-w-4xl mx-auto">
-          <span className="bg-white/20 backdrop-blur-md text-white text-xs font-bold px-4 py-1.5 rounded-full uppercase tracking-widest mb-4 inline-block shadow-sm">
-            B2B Distribution & Partner Network
+  const fetchPublicProducts = async () => {
+    try {
+      const res = await API.get('/products/public');
+      setProducts(res.data.products || []);
+    } catch (err) {
+      console.error("Error fetching public products", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+      <Navbar />
+
+      {/* Cut-to-Cut Full-Length Image Slider */}
+      <section className="relative w-full h-[450px] sm:h-[550px] overflow-hidden bg-slate-900">
+        {SLIDER_IMAGES.map((img, index) => (
+          <div
+            key={index}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              index === currentSlide ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
+            }`}
+          >
+            <img src={img} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-8 sm:p-16">
+              <div className="max-w-3xl">
+                <span className="bg-amber-600 text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-3 inline-block">
+                  FMCG & Beyond Network
+                </span>
+                <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+                  Scale Your Distribution Business With Massive Profit Margins
+                </h1>
+                <p className="text-sm sm:text-base text-slate-200 mt-2 font-light">
+                  Partner with Xellent Food Products as a Super Stockist or Distributor and dominate your regional market.
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </section>
+
+      {/* Partnership Section */}
+      <section id="partner-section" className="py-20 px-6 max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-16">
+          <span className="text-xs font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+            Lucrative Opportunity
           </span>
-          <h2 className="text-4xl sm:text-5xl font-extrabold mb-6 tracking-tight">Premium Confectionery & Snack Distribution</h2>
-          <p className="text-lg sm:text-xl opacity-95 mb-8 max-w-2xl mx-auto font-light leading-relaxed">
-            Empowering Super Stockists, Distributors, and Wholesalers with direct bulk ordering, tiered pricing, and automated inventory management.
+          <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3 tracking-tight">
+            Why Partner With Xellent Food Products?
+          </h2>
+          <p className="text-sm text-slate-500 mt-2">
+            Our tiered distribution structure is engineered to maximize profitability for Super Stockists and regional Distributors.
           </p>
-          <a href="/login" className="bg-white text-amber-700 font-bold px-8 py-3.5 rounded-xl shadow-xl hover:bg-slate-100 transition inline-block">
-            Access Stockist Portal
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-400 transition">
+            <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl w-fit mb-6"><TrendingUp className="w-8 h-8" /></div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">High Profit Margins</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Enjoy industry-leading margins designed specifically to ensure rapid ROI and substantial earnings for both Super Stockists and Distributors.
+            </p>
+          </div>
+          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-400 transition">
+            <div className="p-4 bg-blue-50 text-blue-600 rounded-2xl w-fit mb-6"><ShieldCheck className="w-8 h-8" /></div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Exclusive Territory Rights</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Secure protected operating zones for Super Stockists, ensuring zero internal channel conflict and complete regional market capture.
+            </p>
+          </div>
+          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group hover:border-amber-400 transition">
+            <div className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl w-fit mb-6"><Users className="w-8 h-8" /></div>
+            <h3 className="text-xl font-extrabold text-slate-900 mb-2">Complete Downline Control</h3>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Easily provision and manage your retail shops and subordinate distributors using our advanced digital management portal.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-12 text-center">
+          <a href="/login" className="inline-flex items-center gap-2 px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl shadow-xl transition text-sm">
+            <span>Apply For Super Stockist / Distributor Access</span>
+            <ArrowRight className="w-4 h-4" />
           </a>
         </div>
       </section>
 
-      <main className="max-w-7xl mx-auto px-6 py-16">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 border-b pb-4 border-slate-200 gap-4">
-          <div>
-            <h3 className="text-3xl font-extrabold text-slate-900 tracking-tight">Product Showcase</h3>
-            <p className="text-sm text-slate-500 mt-1">Explore our certified confectionery and snack range with official retail pricing.</p>
+      {/* Dynamic Products Showcase */}
+      <section className="bg-slate-100 py-20 px-6 border-t border-slate-200">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
+            <div>
+              <span className="text-xs font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                Official Catalog
+              </span>
+              <h2 className="text-3xl font-black text-slate-900 mt-3 tracking-tight">Our FMCG Product Range</h2>
+            </div>
+            <p className="text-xs text-slate-500 max-w-md">
+              High-quality consumer products added and managed directly through our administrative dashboard, ready for bulk dispatch.
+            </p>
           </div>
-          <span className="text-xs bg-amber-100 text-amber-800 font-bold px-3.5 py-1.5 rounded-full shadow-sm flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" /> Retail MRP Showcase
-          </span>
-        </div>
-        
-        {loading ? (
-          <div className="text-center py-24 text-slate-400 font-medium">Loading live product catalogue...</div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-            {products.map((product) => (
-              <div key={product._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden flex flex-col hover:shadow-xl hover:border-amber-200 transition duration-300">
-                <div className="h-44 bg-gradient-to-br from-slate-100 to-slate-200 flex flex-col items-center justify-center text-slate-400 font-medium p-4">
-                  <PackageCheck className="w-10 h-10 text-amber-500 mb-2 opacity-80" />
-                  <span className="text-xs text-slate-600 font-semibold">{product.name}</span>
-                </div>
-                <div className="p-6 flex-1 flex flex-col justify-between bg-white">
+
+          {loading ? (
+            <div className="text-center py-16 text-slate-400 text-xs font-semibold">Loading catalog items...</div>
+          ) : products.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-semibold">
+              No products available yet. Check back soon or log in as admin to add inventory.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {products.map((product) => (
+                <div key={product._id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
                   <div>
-                    <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">{product.category}</span>
-                    <h4 className="font-bold text-lg text-slate-900 mt-1 line-clamp-1">{product.name}</h4>
-                    <p className="text-xs text-slate-400 mt-1">SKU: {product.sku}</p>
-                  </div>
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <div>
-                      <span className="text-xs text-slate-400 font-medium block">Retail MRP</span>
-                      <span className="text-2xl font-black text-slate-900">₹{product.mrp}</span>
+                    <div className="h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                      {product.image ? (
+                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package className="w-12 h-12 text-slate-300" />
+                      )}
+                      <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase">
+                        {product.category || 'FMCG'}
+                      </span>
                     </div>
-                    <span className="text-xs bg-emerald-50 text-emerald-700 font-bold px-3 py-1.5 rounded-lg border border-emerald-100">
-                      {product.status}
-                    </span>
+                    <div className="p-5">
+                      <h3 className="font-extrabold text-slate-900 text-base">{product.name}</h3>
+                      <p className="text-xs text-slate-500 mt-1 line-clamp-2">{product.description || 'Premium quality product manufactured for high consumer demand.'}</p>
+                    </div>
+                  </div>
+                  <div className="p-5 pt-0 flex justify-between items-center border-t border-slate-100 mt-4">
+                    <div>
+                      <span className="text-[10px] uppercase font-bold text-slate-400 block">MRP</span>
+                      <span className="text-base font-black text-slate-900">₹{product.mrp}</span>
+                    </div>
+                    <a href="/login" className="px-4 py-2 bg-amber-50 text-amber-700 hover:bg-amber-100 font-bold rounded-xl text-xs transition">
+                      Order Bulk
+                    </a>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      <Footer />
     </div>
   );
 }
