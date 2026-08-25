@@ -6,9 +6,9 @@ import Footer from '@/app/components/Footer';
 import { ShieldCheck, TrendingUp, Users, ArrowRight, Package, CheckCircle2 } from 'lucide-react';
 
 const SLIDER_IMAGES = [
-  '/images/slider-1.jpg',
-  '/images/slider-2.jpg',
-  '/images/slider-3.jpg'
+  '/images/slider-1.png',
+  '/images/slider-2.png',
+  '/images/slider-3.png'
 ];
 
 export default function PublicHomePage() {
@@ -70,8 +70,8 @@ export default function PublicHomePage() {
         ))}
       </section>
 
-      {/* About Us & Vision / Mission Section */}
-      <section id="about" className="py-20 px-6 max-w-7xl mx-auto">
+      {/* About Us Preview Section */}
+      <section className="py-20 px-6 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-20">
           <div>
             <span className="text-xs font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
@@ -83,9 +83,12 @@ export default function PublicHomePage() {
             <p className="text-sm text-slate-600 mt-4 leading-relaxed font-light">
               Xllent Foods is a dynamic leader in the consumer packaged goods industry, dedicated to manufacturing and distributing exceptional confectionery, snacks, and daily essentials. Our robust multi-tier distribution ecosystem connects top-tier manufacturers seamlessly with Super Stockists, regional Distributors, and local retail shops.
             </p>
-            <p className="text-sm text-slate-600 mt-3 leading-relaxed font-light">
-              By combining high-volume operational efficiency with advanced digital management workflows, we ensure complete transparency, rapid stock replenishment, and maximum profitability across our entire network.
-            </p>
+            <div className="mt-6">
+              <a href="/about" className="inline-flex items-center gap-2 text-xs font-bold text-amber-600 hover:text-amber-700 uppercase tracking-wider">
+                <span>Explore Full Company Profile</span>
+                <ArrowRight className="w-4 h-4" />
+              </a>
+            </div>
           </div>
           <div className="bg-gradient-to-br from-amber-500 to-orange-600 p-8 sm:p-12 rounded-3xl text-white shadow-xl">
             <h3 className="text-2xl font-black tracking-tight mb-4">The Xllent Advantage</h3>
@@ -103,25 +106,6 @@ export default function PublicHomePage() {
                 <span>Cutting-edge digital portal tracking live orders, invoices, and downline partners.</span>
               </li>
             </ul>
-          </div>
-        </div>
-
-        {/* Vision & Mission Cards */}
-        <div id="vision-mission" className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-10 border-t border-slate-200">
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-            <div className="text-amber-600 font-extrabold text-xs uppercase tracking-widest mb-2">Our Vision</div>
-            <h3 className="text-2xl font-black text-slate-900 mb-3">Empowering Global Distribution Networks</h3>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              To build the most trusted, transparent, and technologically advanced FMCG distribution network globally—fostering long-term prosperity and unmatched market reach for every partner in our hierarchy.
-            </p>
-          </div>
-
-          <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
-            <div className="text-amber-600 font-extrabold text-xs uppercase tracking-widest mb-2">Our Mission</div>
-            <h3 className="text-2xl font-black text-slate-900 mb-3">Quality Products & Profitable Growth</h3>
-            <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              To consistently deliver superior quality food products that consumers love, while equipping our Super Stockists and Distributors with high profit margins, secure territories, and digital tools to scale effortlessly.
-            </p>
           </div>
         </div>
       </section>
@@ -179,7 +163,7 @@ export default function PublicHomePage() {
         </div>
 
         <div className="mt-12 text-center">
-          <a href="/login" className="inline-flex items-center gap-2 px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl shadow-xl transition text-sm">
+          <a href="/partnership" className="inline-flex items-center gap-2 px-8 py-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-2xl shadow-xl transition text-sm">
             <span>Apply For Super Stockist / Distributor Access</span>
             <ArrowRight className="w-4 h-4" />
           </a>
