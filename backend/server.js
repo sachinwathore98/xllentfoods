@@ -17,14 +17,20 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
+    // Allow explicit allowed origins or any Vercel preview deployment URL automatically
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+      return callback(null, true);
+    } else {
       return callback(new Error('CORS policy violation: Access denied from this origin.'), false);
     }
-    return callback(null, true);
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Handle preflight options explicitly
+app.options('*', cors());
 app.use(express.json());
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/xellent-dms';
@@ -60,6 +66,17 @@ const productSchema = new mongoose.Schema({
   image: { type: String }
 });
 const Product = mongoose.model('Product', productSchema);
+
+const partnershipEnquirySchema = new mongoose.Schema({
+  fullName: { type: String, required: true },
+  email: { type: String, required: true },
+  phone: { type: String, required: true },
+  roleType: { type: String, required: true }, // 'Super Stockist' or 'Distributor'
+  location: { type: String, required: true },
+  message: { type: String },
+  createdAt: { type: Date, default: Date.now }
+});
+const PartnershipEnquiry = mongoose.model('PartnershipEnquiry', partnershipEnquirySchema);
 
 // --- SEED DEFAULT SUPER ADMIN ---
 async function seedSuperAdmin() {
@@ -241,27 +258,13 @@ app.post('/api/auth/create-user', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-
-// --- PARTNERSHIP ENQUIRY SCHEMA & ROUTE ---
-const partnershipEnquirySchema = new mongoose.Schema({
-  fullName: { type: String, required: true },
-  email: { type: String, required: true },
-  phone: { type: String, required: true },
-  roleType: { type: String, required: true }, // 'Super Stockist' or 'Distributor'
-  location: { type: String, required: true },
-  message: { type: String },
-  createdAt: { type: Date, default: Date.now }
-});
-const PartnershipEnquiry = mongoose.model('PartnershipEnquiry', partnershipEnquirySchema);
-
+// --- PARTNERSHIP ENQUIRY ROUTE ---
 app.post('/api/partnership/enquiry', async (req, res) => {
   try {
     const { fullName, email, phone, roleType, location, message } = req.body;
     
     // Save to MongoDB
-    const newEnquiry = await PartnershipEnquiry.create({
+    await PartnershipEnquiry.create({
       fullName, email, phone, roleType, location, message
     });
 
@@ -298,3 +301,6 @@ app.post('/api/partnership/enquiry', async (req, res) => {
     res.status(500).json({ message: 'Failed to submit enquiry. Please try again later.' });
   }
 });
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
