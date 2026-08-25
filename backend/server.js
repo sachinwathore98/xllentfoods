@@ -1,5 +1,5 @@
 const express = require('express');
-const mongoose = require('mongoose');
+const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -17,7 +17,6 @@ const allowedOrigins = [
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    // Allow explicit allowed origins or any Vercel preview deployment URL automatically
     if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
       return callback(null, true);
     } else {
@@ -29,75 +28,73 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Handle preflight options explicitly
 app.options('*', cors());
 app.use(express.json());
 
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/xellent-dms';
-mongoose.connect(MONGO_URI)
-  .then(() => console.log('MongoDB Connected Successfully'))
-  .catch((err) => console.error('MongoDB connection error:', err));
-
-// --- SCHEMAS ---
-const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { 
-    type: String, 
-    enum: ['superadmin', 'admin', 'superstockist', 'distributor', 'shop', 'employee'], 
-    required: true 
-  },
-  parentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  phone: { type: String },
-  location: { type: String },
-  resetOtp: { type: String },
-  otpExpires: { type: Date },
-  createdAt: { type: Date, default: Date.now }
+// --- SUPABASE POSTGRESQL CONNECTION ---
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false } // Required for secure cloud connections like Supabase
 });
-const User = mongoose.model('User', userSchema);
 
-const productSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  category: { type: String, required: true },
-  sku: { type: String, required: true },
-  mrp: { type: Number, required: true },
-  status: { type: String, default: 'In Stock' },
-  image: { type: String }
-});
-const Product = mongoose.model('Product', productSchema);
+pool.connect()
+  .then(() => console.log('Supabase PostgreSQL Connected Successfully'))
+  .catch((err) => console.error('Supabase connection error:', err));
 
-const partnershipEnquirySchema = new mongoose.Schema({
-  fullName: { type: String, required: true },
-  email: { type: String, required: true },
-  phone: { type: String, required: true },
-  roleType: { type: String, required: true }, // 'Super Stockist' or 'Distributor'
-  location: { type: String, required: true },
-  message: { type: String },
-  createdAt: { type: Date, default: Date.now }
-});
-const PartnershipEnquiry = mongoose.model('PartnershipEnquiry', partnershipEnquirySchema);
-
-// --- SEED DEFAULT SUPER ADMIN ---
-async function seedSuperAdmin() {
+// --- INITIALIZE TABLES & SEED SUPERADMIN ---
+async function initDatabase() {
   try {
-    const existingAdmin = await User.findOne({ role: 'superadmin' });
-    if (!existingAdmin) {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        phone VARCHAR(50),
+        location VARCHAR(255),
+        reset_otp VARCHAR(10),
+        otp_expires TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        category VARCHAR(100) NOT NULL,
+        sku VARCHAR(100) NOT NULL,
+        mrp NUMERIC(10,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'In Stock',
+        image TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS partnership_enquiries (
+        id SERIAL PRIMARY KEY,
+        full_name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) NOT NULL,
+        phone VARCHAR(50) NOT NULL,
+        role_type VARCHAR(100) NOT NULL,
+        location VARCHAR(255) NOT NULL,
+        message TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // Seed default superadmin if not exists
+    const adminCheck = await pool.query("SELECT * FROM users WHERE role = 'superadmin'");
+    if (adminCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('Admin@123', 10);
-      await User.create({
-        name: 'Super Admin',
-        email: 'superadmin@xllentfoods.com',
-        password: hashedPassword,
-        role: 'superadmin',
-        phone: '9999999999'
-      });
+      await pool.query(
+        "INSERT INTO users (name, email, password, role, phone) VALUES ($1, $2, $3, $4, $5)",
+        ['Super Admin', 'superadmin@xllentfoods.com', hashedPassword, 'superadmin', '9999999999']
+      );
       console.log('Default SuperAdmin seeded: superadmin@xllentfoods.com / Admin@123');
     }
   } catch (err) {
-    console.error('Error seeding superadmin:', err);
+    console.error('Error initializing database tables:', err);
   }
 }
-seedSuperAdmin();
+initDatabase();
 
 // --- BREVO EMAIL UTILITY ---
 const sendOTPEmail = async (toEmail, otpCode, recipientName = 'Partner') => {
@@ -138,20 +135,22 @@ const sendOTPEmail = async (toEmail, otpCode, recipientName = 'Partner') => {
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ message: 'Invalid email or password' });
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (result.rows.length === 0) return res.status(400).json({ message: 'Invalid email or password' });
 
+    const user = result.rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(400).json({ message: 'Invalid email or password' });
 
     const token = jwt.sign(
-      { userId: user._id, role: user.role, email: user.email }, 
+      { userId: user.id, role: user.role, email: user.email }, 
       process.env.JWT_SECRET || 'fallback_secret', 
       { expiresIn: '7d' }
     );
 
-    res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role }, message: 'Login successful' });
+    res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role }, message: 'Login successful' });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error during login' });
   }
 });
@@ -159,13 +158,14 @@ app.post('/api/auth/login', async (req, res) => {
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "No account found with this email" });
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (result.rows.length === 0) return res.status(404).json({ message: "No account found with this email" });
 
+    const user = result.rows[0];
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.resetOtp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000;
-    await user.save();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await pool.query("UPDATE users SET reset_otp = $1, otp_expires = $2 WHERE email = $3", [otp, otpExpires, email]);
 
     await sendOTPEmail(user.email, otp, user.name);
     res.json({ message: "OTP sent successfully to your email via Brevo" });
@@ -177,16 +177,17 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
-    const user = await User.findOne({ email });
+    const result = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     
-    if (!user || user.resetOtp !== otp || user.otpExpires < Date.now()) {
+    if (result.rows.length === 0) return res.status(400).json({ message: "Invalid or expired OTP code" });
+    const user = result.rows[0];
+
+    if (user.reset_otp !== otp || new Date(user.otp_expires) < new Date()) {
       return res.status(400).json({ message: "Invalid or expired OTP code" });
     }
 
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.resetOtp = undefined;
-    user.otpExpires = undefined;
-    await user.save();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await pool.query("UPDATE users SET password = $1, reset_otp = NULL, otp_expires = NULL WHERE email = $2", [hashedPassword, email]);
 
     res.json({ message: "Password reset successful. You can now login." });
   } catch (error) {
@@ -197,21 +198,24 @@ app.post('/api/auth/reset-password', async (req, res) => {
 // --- PRODUCT ROUTES ---
 app.get('/api/products/public', async (req, res) => {
   try {
-    let products = await Product.find({});
-    if (products.length === 0) {
+    let result = await pool.query("SELECT * FROM products");
+    if (result.rows.length === 0) {
       const dummyProducts = [
-        { name: 'Xllent Premium Butter Cookies', category: 'Confectionery', sku: 'XEL-BC-01', mrp: 150, status: 'In Stock' },
-        { name: 'Xllent Choco-Dip Wafers', category: 'Snacks', sku: 'XEL-CW-02', mrp: 90, status: 'In Stock' },
-        { name: 'Xllent Spicy Masala Bhujia', category: 'Namkeen', sku: 'XEL-MB-03', mrp: 60, status: 'In Stock' },
-        { name: 'Xllent Fruit Jam Drops', category: 'Candies', sku: 'XEL-JD-04', mrp: 120, status: 'In Stock' },
-        { name: 'Xllent Roasted Cashew Crunch', category: 'Dry Fruits', sku: 'XEL-RC-05', mrp: 299, status: 'In Stock' },
-        { name: 'Xllent Minty Fresh Chewing Gums', category: 'Confectionery', sku: 'XEL-MF-06', mrp: 40, status: 'In Stock' }
+        ['Xllent Premium Butter Cookies', 'Confectionery', 'XEL-BC-01', 150, 'In Stock'],
+        ['Xllent Choco-Dip Wafers', 'Snacks', 'XEL-CW-02', 90, 'In Stock'],
+        ['Xllent Spicy Masala Bhujia', 'Namkeen', 'XEL-MB-03', 60, 'In Stock'],
+        ['Xllent Fruit Jam Drops', 'Candies', 'XEL-JD-04', 120, 'In Stock'],
+        ['Xllent Roasted Cashew Crunch', 'Dry Fruits', 'XEL-RC-05', 299, 'In Stock'],
+        ['Xllent Minty Fresh Chewing Gums', 'Confectionery', 'XEL-MF-06', 40, 'In Stock']
       ];
-      await Product.insertMany(dummyProducts);
-      products = await Product.find({});
+      for (let p of dummyProducts) {
+        await pool.query("INSERT INTO products (name, category, sku, mrp, status) VALUES ($1, $2, $3, $4, $5)", p);
+      }
+      result = await pool.query("SELECT * FROM products");
     }
-    res.json({ products });
+    res.json({ products: result.rows });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Server error loading products' });
   }
 });
@@ -219,42 +223,13 @@ app.get('/api/products/public', async (req, res) => {
 app.post('/api/admin/products', async (req, res) => {
   try {
     const { name, category, sku, mrp, status, image } = req.body;
-    const newProduct = new Product({ name, category, sku, mrp, status: status || 'In Stock', image });
-    await newProduct.save();
-    res.status(201).json({ message: 'Product added successfully', product: newProduct });
+    const result = await pool.query(
+      "INSERT INTO products (name, category, sku, mrp, status, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+      [name, category, sku, mrp, status || 'In Stock', image]
+    );
+    res.status(201).json({ message: 'Product added successfully', product: result.rows[0] });
   } catch (err) {
     res.status(500).json({ message: 'Failed to add product' });
-  }
-});
-
-// --- USER CREATION ENDPOINT ---
-app.post('/api/auth/create-user', async (req, res) => {
-  try {
-    const { name, email, password, role, parentId, phone, location } = req.body;
-    
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: 'User with this email already exists.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password || 'Xellent@123', 10);
-    
-    const newUser = await User.create({
-      name,
-      email,
-      password: hashedPassword,
-      role,
-      parentId: parentId || null,
-      phone,
-      location
-    });
-
-    res.status(201).json({ 
-      message: 'Account created successfully', 
-      user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role } 
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Server error while creating user' });
   }
 });
 
@@ -263,12 +238,11 @@ app.post('/api/partnership/enquiry', async (req, res) => {
   try {
     const { fullName, email, phone, roleType, location, message } = req.body;
     
-    // Save to MongoDB
-    await PartnershipEnquiry.create({
-      fullName, email, phone, roleType, location, message
-    });
+    await pool.query(
+      "INSERT INTO partnership_enquiries (full_name, email, phone, role_type, location, message) VALUES ($1, $2, $3, $4, $5, $6)",
+      [fullName, email, phone, roleType, location, message]
+    );
 
-    // Send notification email via Brevo to official inbox
     const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
     apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
@@ -294,7 +268,6 @@ app.post('/api/partnership/enquiry', async (req, res) => {
     `;
 
     await apiInstance.sendTransacEmail(sendSmtpEmail);
-
     res.status(201).json({ message: 'Partnership enquiry submitted successfully! Our team will contact you shortly.' });
   } catch (err) {
     console.error('Enquiry Error:', err);
