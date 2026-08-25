@@ -11,7 +11,14 @@ export default function Navbar() {
         {/* Logo */}
         <div className="flex items-center gap-3">
           <a href="/">
-            <img src="/images/logo.png" alt="Xllent Foods Logo" className="h-12 w-auto object-contain" />
+            <img 
+              src="/images/logo.png" 
+              alt="Xllent Foods Logo" 
+              className="h-12 w-auto object-contain"
+              onError={(e: any) => {
+                e.target.style.display = 'none';
+              }}
+            />
           </a>
         </div>
 
