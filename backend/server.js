@@ -8,7 +8,7 @@ require('dotenv').config();
 
 const app = express();
 
-// --- CORS CONFIGURATION (Fixes Vercel Connection Blocks) ---
+// --- CORS CONFIGURATION ---
 const allowedOrigins = [
   'https://xllentfoods.vercel.app',
   'http://localhost:3000'
@@ -69,12 +69,12 @@ async function seedSuperAdmin() {
       const hashedPassword = await bcrypt.hash('Admin@123', 10);
       await User.create({
         name: 'Super Admin',
-        email: 'superadmin@xellent.com',
+        email: 'superadmin@xllentfoods.com',
         password: hashedPassword,
         role: 'superadmin',
         phone: '9999999999'
       });
-      console.log('Default SuperAdmin seeded: superadmin@xellent.com / Admin@123');
+      console.log('Default SuperAdmin seeded: superadmin@xllentfoods.com / Admin@123');
     }
   } catch (err) {
     console.error('Error seeding superadmin:', err);
@@ -90,21 +90,21 @@ const sendOTPEmail = async (toEmail, otpCode, recipientName = 'Partner') => {
   const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
   sendSmtpEmail.sender = { 
     email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', 
-    name: "Xellent Food Products" 
+    name: "Xllent Foods" 
   };
   sendSmtpEmail.to = [{ email: toEmail, name: recipientName }];
-  sendSmtpEmail.subject = "Your Verification Code - Xellent DMS";
+  sendSmtpEmail.subject = "Your Verification Code - Xllent Foods DMS";
   sendSmtpEmail.htmlContent = `
     <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
-      <h2 style="color: #d97706; text-align: center;">Xellent Food Products</h2>
+      <h2 style="color: #d97706; text-align: center;">Xllent Foods</h2>
       <p>Hello <b>${recipientName}</b>,</p>
-      <p>You requested an OTP for password recovery on the Xellent Distribution Management System.</p>
+      <p>You requested an OTP for password recovery on the Xllent Foods Distribution Management System.</p>
       <div style="text-align: center; margin: 30px 0;">
         <span style="font-size: 32px; font-weight: bold; background: #fef3c7; color: #b45309; padding: 12px 24px; letter-spacing: 6px; border-radius: 8px; display: inline-block;">${otpCode}</span>
       </div>
       <p>This code is valid for 10 minutes. Do not share this code with anyone.</p>
       <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #64748b; text-align: center;">Xellent Food Products B2B Distribution Network</p>
+      <p style="font-size: 12px; color: #64748b; text-align: center;">Xllent Foods B2B Distribution Network</p>
     </div>
   `;
 
@@ -139,7 +139,6 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Forgot Password - Send OTP via Brevo
 app.post('/api/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body;
@@ -148,7 +147,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     user.resetOtp = otp;
-    user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 mins
+    user.otpExpires = Date.now() + 10 * 60 * 1000;
     await user.save();
 
     await sendOTPEmail(user.email, otp, user.name);
@@ -158,7 +157,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   }
 });
 
-// Reset Password with OTP
 app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
@@ -185,12 +183,12 @@ app.get('/api/products/public', async (req, res) => {
     let products = await Product.find({});
     if (products.length === 0) {
       const dummyProducts = [
-        { name: 'Xellent Premium Butter Cookies', category: 'Confectionery', sku: 'XEL-BC-01', mrp: 150, status: 'In Stock' },
-        { name: 'Xellent Choco-Dip Wafers', category: 'Snacks', sku: 'XEL-CW-02', mrp: 90, status: 'In Stock' },
-        { name: 'Xellent Spicy Masala Bhujia', category: 'Namkeen', sku: 'XEL-MB-03', mrp: 60, status: 'In Stock' },
-        { name: 'Xellent Fruit Jam Drops', category: 'Candies', sku: 'XEL-JD-04', mrp: 120, status: 'In Stock' },
-        { name: 'Xellent Roasted Cashew Crunch', category: 'Dry Fruits', sku: 'XEL-RC-05', mrp: 299, status: 'In Stock' },
-        { name: 'Xellent Minty Fresh Chewing Gums', category: 'Confectionery', sku: 'XEL-MF-06', mrp: 40, status: 'In Stock' }
+        { name: 'Xllent Premium Butter Cookies', category: 'Confectionery', sku: 'XEL-BC-01', mrp: 150, status: 'In Stock' },
+        { name: 'Xllent Choco-Dip Wafers', category: 'Snacks', sku: 'XEL-CW-02', mrp: 90, status: 'In Stock' },
+        { name: 'Xllent Spicy Masala Bhujia', category: 'Namkeen', sku: 'XEL-MB-03', mrp: 60, status: 'In Stock' },
+        { name: 'Xllent Fruit Jam Drops', category: 'Candies', sku: 'XEL-JD-04', mrp: 120, status: 'In Stock' },
+        { name: 'Xllent Roasted Cashew Crunch', category: 'Dry Fruits', sku: 'XEL-RC-05', mrp: 299, status: 'In Stock' },
+        { name: 'Xllent Minty Fresh Chewing Gums', category: 'Confectionery', sku: 'XEL-MF-06', mrp: 40, status: 'In Stock' }
       ];
       await Product.insertMany(dummyProducts);
       products = await Product.find({});
@@ -212,7 +210,7 @@ app.post('/api/admin/products', async (req, res) => {
   }
 });
 
-// --- USER CREATION ENDPOINT (Downline Hierarchy Onboarding) ---
+// --- USER CREATION ENDPOINT ---
 app.post('/api/auth/create-user', async (req, res) => {
   try {
     const { name, email, password, role, parentId, phone, location } = req.body;
