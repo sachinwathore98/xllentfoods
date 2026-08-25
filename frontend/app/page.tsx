@@ -43,31 +43,24 @@ export default function PublicHomePage() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       <Navbar />
 
-      {/* Cut-to-Cut Full-Length Image Slider */}
-      <section className="relative w-full h-[450px] sm:h-[550px] overflow-hidden bg-slate-900">
-        {SLIDER_IMAGES.map((img, index) => (
-          <div
-            key={index}
-            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-              index === currentSlide ? 'opacity-100 scale-100' : 'opacity-0 scale-105'
-            }`}
-          >
-            <img src={img} alt={`Slide ${index + 1}`} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent flex flex-col justify-end p-8 sm:p-16">
-              <div className="max-w-3xl">
-                <span className="bg-amber-600 text-white text-xs font-bold uppercase tracking-widest px-3 py-1 rounded-full mb-3 inline-block">
-                  FMCG & Beyond Network
-                </span>
-                <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-                  Scale Your Distribution Business With Massive Profit Margins
-                </h1>
-                <p className="text-sm sm:text-base text-slate-200 mt-2 font-light">
-                  Partner with Xllent Foods as a Super Stockist or Distributor and dominate your regional market.
-                </p>
-              </div>
+      {/* Full-Length Responsive Image Slider without Overlap */}
+      <section className="relative w-full overflow-hidden bg-slate-900">
+        <div className="relative w-full">
+          {SLIDER_IMAGES.map((img, index) => (
+            <div
+              key={index}
+              className={`transition-opacity duration-1000 ease-in-out ${
+                index === currentSlide ? 'opacity-100 relative block' : 'opacity-0 absolute inset-0 hidden'
+              }`}
+            >
+              <img 
+                src={img} 
+                alt={`Slide ${index + 1}`} 
+                className="w-full h-auto object-contain block mx-auto" 
+              />
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
 
       {/* About Us Preview Section */}

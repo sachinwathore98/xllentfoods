@@ -14,7 +14,7 @@ export default function Navbar() {
             <img 
               src="/images/logo.png" 
               alt="Xllent Foods Logo" 
-              className="h-12 w-auto object-contain"
+              className="h-10 sm:h-12 w-auto object-contain"
               onError={(e: any) => {
                 e.target.style.display = 'none';
               }}
