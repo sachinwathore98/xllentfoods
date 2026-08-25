@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import Image from 'next/image';
 import { Menu, X, LogIn, UserPlus } from 'lucide-react';
 
 export default function Navbar() {
@@ -10,14 +11,14 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <a href="/">
-            <img 
+          <a href="/" className="flex items-center">
+            <Image 
               src="/images/logo.png" 
               alt="Xllent Foods Logo" 
+              width={160} 
+              height={48}
+              priority
               className="h-10 sm:h-12 w-auto object-contain"
-              onError={(e: any) => {
-                e.target.style.display = 'none';
-              }}
             />
           </a>
         </div>
