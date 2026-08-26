@@ -600,64 +600,59 @@ const handlePartnershipEnquiry = async (req, res) => {
       [fullName, email, phone, roleType, location, message]
     );
 
-    // 2. Send Emails via Brevo (Compatible with @getbrevo/brevo package)
+    // 2. Send Emails via Brevo (Using the modern @getbrevo/brevo syntax)
     try {
       if (process.env.BREVO_API_KEY) {
-        let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-        
-        // Correct authentication assignment for newer package versions
-        let apiKey = apiInstance.authentications['apiKey'];
-        if (apiKey) {
-          apiKey.apiKey = process.env.BREVO_API_KEY;
-        }
+        const { BrevoClient } = require('@getbrevo/brevo');
+        const brevo = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
 
         const senderEmail = process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com';
 
         // --- EMAIL A: Notification to Admin (xllentfoods91@gmail.com) ---
-        let adminEmail = new SibApiV3Sdk.SendSmtpEmail();
-        adminEmail.sender = { email: senderEmail, name: "Xllent Foods Portal" };
-        adminEmail.to = [{ email: senderEmail, name: "Admin" }];
-        adminEmail.subject = `New Partnership Enquiry: ${roleType} - ${fullName}`;
-        adminEmail.htmlContent = `
-          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
-            <h2 style="color: #d97706; text-align: center;">New Partnership Application</h2>
-            <p>You have received a new partnership enquiry from your public website:</p>
-            <ul style="line-height: 1.6; background: #f8fafc; padding: 15px 25px; border-radius: 8px;">
-              <li><b>Full Name:</b> ${fullName}</li>
-              <li><b>Email:</b> ${email}</li>
-              <li><b>Phone:</b> ${phone}</li>
-              <li><b>Role Requested:</b> ${roleType}</li>
-              <li><b>Location:</b> ${location}</li>
-              <li><b>Message:</b> ${message || 'N/A'}</li>
-            </ul>
-          </div>
-        `;
-        await apiInstance.sendTransacEmail(adminEmail);
+        await brevo.transactionalEmails.sendTransacEmail({
+          sender: { email: senderEmail, name: "Xllent Foods Portal" },
+          to: [{ email: senderEmail, name: "Admin" }],
+          subject: `New Partnership Enquiry: ${roleType} - ${fullName}`,
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
+              <h2 style="color: #d97706; text-align: center;">New Partnership Application</h2>
+              <p>You have received a new partnership enquiry from your public website:</p>
+              <ul style="line-height: 1.6; background: #f8fafc; padding: 15px 25px; border-radius: 8px;">
+                <li><b>Full Name:</b> ${fullName}</li>
+                <li><b>Email:</b> ${email}</li>
+                <li><b>Phone:</b> ${phone}</li>
+                <li><b>Role Requested:</b> ${roleType}</li>
+                <li><b>Location:</b> ${location}</li>
+                <li><b>Message:</b> ${message || 'N/A'}</li>
+              </ul>
+            </div>
+          `
+        });
 
         // --- EMAIL B: Welcome Email to the Sender ---
-        let welcomeEmail = new SibApiV3Sdk.SendSmtpEmail();
-        welcomeEmail.sender = { email: senderEmail, name: "Xllent Foods" };
-        welcomeEmail.to = [{ email: email, name: fullName }];
-        welcomeEmail.subject = "Welcome to Xllent Foods – Partnership Enquiry Received!";
-        welcomeEmail.htmlContent = `
-          <div style="font-family: Arial, sans-serif; padding: 25px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
-            <div style="text-align: center; margin-bottom: 20px;">
-              <h2 style="color: #d97706; margin: 0;">Xllent Foods</h2>
-              <p style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Distribution Management System</p>
+        await brevo.transactionalEmails.sendTransacEmail({
+          sender: { email: senderEmail, name: "Xllent Foods" },
+          to: [{ email: email, name: fullName }],
+          subject: "Welcome to Xllent Foods – Partnership Enquiry Received!",
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; padding: 25px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+              <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #d97706; margin: 0;">Xllent Foods</h2>
+                <p style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Distribution Management System</p>
+              </div>
+              <p>Dear <b>${fullName}</b>,</p>
+              <p>Thank you for your interest in partnering with <b>Xllent Foods</b> as a <b>${roleType}</b> for the <b>${location}</b> region.</p>
+              <p>We have successfully received your application details. Our regional expansion team is currently reviewing your submission and will get in touch with you shortly to discuss wholesale margins, territory rights, and onboarding credentials.</p>
+              <div style="background: #f8fafc; padding: 15px 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #d97706;">
+                <p style="margin: 0; font-size: 13px; color: #475569;"><b>Submitted Application Summary:</b></p>
+                <p style="margin: 5px 0 0 0; font-size: 12px; color: #64748b;">Role: ${roleType} | Location: ${location} | Phone: ${phone}</p>
+              </div>
+              <p>If you have any urgent queries, you can reach out to us directly at <a href="mailto:${senderEmail}" style="color: #d97706; text-decoration: none;">${senderEmail}</a>.</p>
+              <p style="margin-top: 30px;">Warm regards,</p>
+              <p style="font-weight: bold; color: #1e293b; margin-top: -10px;">The Xllent Foods Team</p>
             </div>
-            <p>Dear <b>${fullName}</b>,</p>
-            <p>Thank you for your interest in partnering with <b>Xllent Foods</b> as a <b>${roleType}</b> for the <b>${location}</b> region.</p>
-            <p>We have successfully received your application details. Our regional expansion team is currently reviewing your submission and will get in touch with you shortly to discuss wholesale margins, territory rights, and onboarding credentials.</p>
-            <div style="background: #f8fafc; padding: 15px 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #d97706;">
-              <p style="margin: 0; font-size: 13px; color: #475569;"><b>Submitted Application Summary:</b></p>
-              <p style="margin: 5px 0 0 0; font-size: 12px; color: #64748b;">Role: ${roleType} | Location: ${location} | Phone: ${phone}</p>
-            </div>
-            <p>If you have any urgent queries, you can reach out to us directly at <a href="mailto:${senderEmail}" style="color: #d97706; text-decoration: none;">${senderEmail}</a>.</p>
-            <p style="margin-top: 30px;">Warm regards,</p>
-            <p style="font-weight: bold; color: #1e293b; margin-top: -10px;">The Xllent Foods Team</p>
-          </div>
-        `;
-        await apiInstance.sendTransacEmail(welcomeEmail);
+          `
+        });
       }
     } catch (emailErr) {
       console.error("Brevo Email Warning (Enquiry saved to DB):", emailErr.message || emailErr);
