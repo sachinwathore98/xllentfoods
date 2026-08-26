@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { ShieldCheck, TrendingUp, Users, ArrowRight, Package, CheckCircle2, Sparkles, Award, Zap, Globe2 } from 'lucide-react';
+import { ShieldCheck, TrendingUp, Users, ArrowRight, Package, CheckCircle2, Sparkles, Award } from 'lucide-react';
 
 const SLIDER_IMAGES = [
   '/images/slider-1.png',
@@ -33,10 +33,10 @@ export default function PublicHomePage() {
   const fetchInitialData = async () => {
     try {
       setLoading(true);
-      // Fetch categories and public products concurrently
+      // Fetch categories and products using the exact same working endpoint as /products page
       const [catRes, prodRes] = await Promise.all([
         API.get('/categories').catch(() => ({ data: { categories: [] } })),
-        API.get('/products/public').catch(() => ({ data: { products: [] } }))
+        API.get('/admin/products').catch(() => ({ data: { products: [] } }))
       ]);
       
       setCategories(catRes.data.categories || []);
@@ -53,7 +53,7 @@ export default function PublicHomePage() {
     try {
       setLoading(true);
       const endpoint = categoryName === 'All' 
-        ? '/products/public' 
+        ? '/admin/products' 
         : `/admin/products?category=${encodeURIComponent(categoryName)}`;
       
       const res = await API.get(endpoint);
@@ -90,7 +90,7 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      {/* High-Impact Value Proposition Bar (Replaces text walls) */}
+      {/* High-Impact Value Proposition Cards */}
       <section className="py-12 px-6 max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="bg-gradient-to-br from-slate-900 to-slate-900/80 p-6 rounded-3xl border border-slate-800 hover:border-amber-500/50 transition-all duration-300 group shadow-xl">
@@ -137,7 +137,7 @@ export default function PublicHomePage() {
             </p>
           </div>
           <div className="relative z-10 shrink-0">
-            <a href="/partnership" className="px-8 py-4 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-2xl shadow-xl transition-all duration-300 hover:scale-105 text-xs uppercase tracking-wider flex items-center gap-2 border border-slate-800">
+            <a href="/partnership" className="px-8 py-4 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-2xl shadow-xl transition-all duration-300 hover:scale-105 text-xs uppercase tracking-wider flex items-center gap-2 border border-slate-800 cursor-pointer">
               <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
               <span>Apply For Partnership</span>
               <ArrowRight className="w-4 h-4 text-amber-400" />
@@ -225,7 +225,7 @@ export default function PublicHomePage() {
                     <span className="text-[10px] uppercase font-bold text-slate-500 block">MRP Price</span>
                     <span className="text-lg font-black text-white">₹{product.mrp}</span>
                   </div>
-                  <a href="/login" className="px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white font-bold rounded-xl text-xs transition duration-200 border border-amber-500/30 shadow-sm">
+                  <a href="/login" className="px-4 py-2.5 bg-amber-600/20 hover:bg-amber-600 text-amber-400 hover:text-white font-bold rounded-xl text-xs transition duration-200 border border-amber-500/30 shadow-sm cursor-pointer">
                     Order Bulk
                   </a>
                 </div>
