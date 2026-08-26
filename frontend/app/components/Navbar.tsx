@@ -1,79 +1,67 @@
 'use client';
+import Link from 'next/link';
 import { useState } from 'react';
-import Image from 'next/image';
-import { Menu, X, LogIn, UserPlus } from 'lucide-react';
+import { Menu, X, ArrowRight, User } from 'lucide-react';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <nav className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-      <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <a href="/" className="flex items-center">
-            <Image 
-              src="/images/logo.png" 
-              alt="Xllent Foods Logo" 
-              width={160} 
-              height={48}
-              priority
-              className="h-10 sm:h-12 w-auto object-contain"
-            />
-          </a>
-        </div>
+    <nav className="bg-slate-950 border-b border-slate-800 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        {/* Brand Logo */}
+        <Link href="/" className="flex items-center gap-3 group">
+          <img 
+            src="/images/logo.png" 
+            alt="Xllent Foods Logo" 
+            className="h-10 w-auto object-contain group-hover:scale-105 transition duration-300" 
+            onError={(e: any) => {
+              // Fallback text if logo image is missing
+              e.target.style.display = 'none';
+              e.target.nextSibling.style.display = 'block';
+            }}
+          />
+          <span className="hidden text-xl font-black text-white tracking-tight">Xllent Foods</span>
+        </Link>
 
         {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-8 text-xs font-bold text-slate-700 uppercase tracking-wider">
-          <a href="/about" className="hover:text-amber-600 transition">About Us</a>
-          <a href="/vision-mission" className="hover:text-amber-600 transition">Vision & Mission</a>
-          <a href="/products" className="hover:text-amber-600 transition">Our Products</a>
-          <a href="/partnership" className="hover:text-amber-600 transition">Partnership</a>
+        <div className="hidden md:flex items-center space-x-8 text-xs font-bold uppercase tracking-wider text-slate-300">
+          <Link href="/" className="hover:text-amber-400 transition">Home</Link>
+          <Link href="/about" className="hover:text-amber-400 transition">About Us</Link>
+          <Link href="/vision" className="hover:text-amber-400 transition">Vision & Mission</Link>
+          <Link href="/products" className="hover:text-amber-400 transition">Our Products</Link>
+          <Link href="/partnership" className="hover:text-amber-400 transition">Partnership</Link>
         </div>
 
-        {/* Action Buttons */}
-        <div className="hidden md:flex items-center gap-3">
-          <a 
-            href="/login" 
-            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl transition text-xs flex items-center gap-1.5"
-          >
-            <LogIn className="w-3.5 h-3.5" />
+        {/* Desktop Actions */}
+        <div className="hidden md:flex items-center space-x-4">
+          <Link href="/login" className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 font-bold rounded-xl text-xs transition flex items-center gap-2">
+            <User className="w-3.5 h-3.5 text-amber-500" />
             <span>Login</span>
-          </a>
-          <a 
-            href="/partnership" 
-            className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl shadow-md transition text-xs flex items-center gap-1.5"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
+          </Link>
+          <Link href="/partnership" className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition shadow-lg shadow-amber-600/20 flex items-center gap-2">
             <span>Become a Partner</span>
-          </a>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
 
         {/* Mobile Menu Button */}
-        <div className="md:hidden">
-          <button 
-            onClick={() => setIsOpen(!isOpen)} 
-            className="text-slate-700 p-2 focus:outline-none"
-          >
-            {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-          </button>
-        </div>
+        <button onClick={() => setIsOpen(!isOpen)} className="md:hidden text-slate-300 hover:text-white focus:outline-none">
+          {isOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+        </button>
       </div>
 
-      {/* Mobile Dropdown Menu */}
+      {/* Mobile Menu Dropdown */}
       {isOpen && (
-        <div className="md:hidden bg-white border-b border-slate-200 px-6 py-4 space-y-3 text-xs font-bold uppercase tracking-wider">
-          <a href="/about" onClick={() => setIsOpen(false)} className="block text-slate-700 hover:text-amber-600 py-1">About Us</a>
-          <a href="/vision-mission" onClick={() => setIsOpen(false)} className="block text-slate-700 hover:text-amber-600 py-1">Vision & Mission</a>
-          <a href="/products" onClick={() => setIsOpen(false)} className="block text-slate-700 hover:text-amber-600 py-1">Our Products</a>
-          <a href="/partnership" onClick={() => setIsOpen(false)} className="block text-slate-700 hover:text-amber-600 py-1">Partnership</a>
-          <div className="pt-3 border-t border-slate-100 flex flex-col gap-2">
-            <a href="/login" className="w-full py-3 bg-slate-100 text-slate-800 font-bold rounded-xl text-center flex items-center justify-center gap-2">
-              <LogIn className="w-4 h-4" /> Login
-            </a>
-            <a href="/partnership" className="w-full py-3 bg-amber-600 text-white font-bold rounded-xl text-center flex items-center justify-center gap-2">
-              <UserPlus className="w-4 h-4" /> Become a Partner
-            </a>
+        <div className="md:hidden bg-slate-900 border-b border-slate-800 px-6 py-6 space-y-4 text-xs font-bold uppercase tracking-wider text-slate-300">
+          <Link href="/" onClick={() => setIsOpen(false)} className="block hover:text-amber-400 transition">Home</Link>
+          <Link href="/about" onClick={() => setIsOpen(false)} className="block hover:text-amber-400 transition">About Us</Link>
+          <Link href="/vision" onClick={() => setIsOpen(false)} className="block hover:text-amber-400 transition">Vision & Mission</Link>
+          <Link href="/products" onClick={() => setIsOpen(false)} className="block hover:text-amber-400 transition">Our Products</Link>
+          <Link href="/partnership" onClick={() => setIsOpen(false)} className="block hover:text-amber-400 transition">Partnership</Link>
+          <div className="pt-4 border-t border-slate-800 flex flex-col gap-3">
+            <Link href="/login" onClick={() => setIsOpen(false)} className="py-3 bg-slate-800 text-center rounded-xl text-white">Login</Link>
+            <Link href="/partnership" onClick={() => setIsOpen(false)} className="py-3 bg-amber-600 text-center rounded-xl text-white">Become a Partner</Link>
           </div>
         </div>
       )}
