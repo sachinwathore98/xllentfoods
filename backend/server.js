@@ -88,7 +88,9 @@ async function initDatabase() {
         shop_price NUMERIC(10,2) DEFAULT 0,
         status VARCHAR(50) DEFAULT 'In Stock',
         image TEXT,
-        description TEXT
+        description TEXT,
+        pieces_per_packet INT DEFAULT 1,
+        packets_per_carton INT DEFAULT 1
       );
 
       ALTER TABLE products ADD COLUMN IF NOT EXISTS super_stockist_price NUMERIC(10,2) DEFAULT 0;
@@ -96,6 +98,8 @@ async function initDatabase() {
       ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_price NUMERIC(10,2) DEFAULT 0;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS pieces_per_packet INT DEFAULT 1;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS packets_per_carton INT DEFAULT 1;
 
       CREATE TABLE IF NOT EXISTS downline_pricing_overrides (
         id SERIAL PRIMARY KEY,
@@ -315,28 +319,24 @@ app.get('/api/products/public', async (req, res) => {
 
 app.post('/api/admin/products', async (req, res) => {
   try {
-    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description } = req.body;
+    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description, piecesPerPacket, packetsPerCarton } = req.body;
     const result = await pool.query(
-      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image, description) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description]
+      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image, description, pieces_per_packet, packets_per_carton) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
+      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, piecesPerPacket || 1, packetsPerCarton || 1]
     );
-    res.status(201).json({ message: 'Product added successfully with tier pricing and description', product: result.rows[0] });
+    res.status(201).json({ message: 'Product added successfully with packaging metrics', product: result.rows[0] });
   } catch (err) {
     console.error('Add Product Error:', err);
     res.status(500).json({ message: 'Failed to add product' });
   }
 });
 
-// --- UPDATE CATEGORY ---
 app.put('/api/admin/categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
-    const result = await pool.query(
-      "UPDATE categories SET name = $1 WHERE id = $2 RETURNING *",
-      [name, id]
-    );
+    const result = await pool.query("UPDATE categories SET name = $1 WHERE id = $2 RETURNING *", [name, id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Category not found' });
     res.json({ message: 'Category updated successfully', category: result.rows[0] });
   } catch (err) {
@@ -345,16 +345,15 @@ app.put('/api/admin/categories/:id', async (req, res) => {
   }
 });
 
-// --- UPDATE PRODUCT ---
 app.put('/api/admin/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description } = req.body;
+    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description, piecesPerPacket, packetsPerCarton } = req.body;
     const result = await pool.query(
       `UPDATE products 
-       SET name = $1, category = $2, sku = $3, mrp = $4, super_stockist_price = $5, distributor_price = $6, shop_price = $7, status = $8, image = $9, description = $10 
-       WHERE id = $11 RETURNING *`,
-      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, id]
+       SET name = $1, category = $2, sku = $3, mrp = $4, super_stockist_price = $5, distributor_price = $6, shop_price = $7, status = $8, image = $9, description = $10, pieces_per_packet = $11, packets_per_carton = $12 
+       WHERE id = $13 RETURNING *`,
+      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, piecesPerPacket || 1, packetsPerCarton || 1, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Product not found' });
     res.json({ message: 'Product updated successfully', product: result.rows[0] });
@@ -364,7 +363,6 @@ app.put('/api/admin/products/:id', async (req, res) => {
   }
 });
 
-// --- DELETE CATEGORY ---
 app.delete('/api/admin/categories/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -377,7 +375,6 @@ app.delete('/api/admin/categories/:id', async (req, res) => {
   }
 });
 
-// --- DELETE PRODUCT ---
 app.delete('/api/admin/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -390,7 +387,6 @@ app.delete('/api/admin/products/:id', async (req, res) => {
   }
 });
 
-// --- FETCH USERS FOR PRICING MATRIX ---
 app.get('/api/admin/users-list', async (req, res) => {
   try {
     const result = await pool.query("SELECT id, name, email, role, location FROM users WHERE role != 'superadmin' ORDER BY role, name ASC");
@@ -401,7 +397,6 @@ app.get('/api/admin/users-list', async (req, res) => {
   }
 });
 
-// --- FETCH SPECIFIC USER'S CUSTOM PRICING OVERRIDES (FIXED SELECT STATEMENT) ---
 app.get('/api/downline-pricing/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -430,7 +425,6 @@ app.get('/api/downline-pricing/:userId', async (req, res) => {
   }
 });
 
-// --- UPDATE PER-USER PER-PRODUCT CUSTOM PRICE ---
 app.post('/api/downline-pricing/set-user-price', async (req, res) => {
   try {
     const { userId, productId, customPrice } = req.body;
@@ -448,7 +442,6 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
   }
 });
 
-// --- SMART ORDER ROUTING & FULFILLMENT ---
 app.get('/api/orders', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -474,7 +467,6 @@ app.post('/api/orders/smart', async (req, res) => {
 
     let targetSellerId = buyer.parent_id;
 
-    // Strict Rulebook Fallback Routing if parent_id is missing
     if (!targetSellerId) {
       if (buyer.role === 'shop') {
         const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
@@ -525,7 +517,6 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-// --- GLOBAL ERROR CATCHER ---
 app.use((err, req, res, next) => {
   console.error('Unhandled Express Error:', err.stack);
   res.status(500).json({ message: 'Internal server error occurred.' });

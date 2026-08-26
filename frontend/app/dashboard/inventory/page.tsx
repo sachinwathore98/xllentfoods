@@ -15,6 +15,8 @@ interface Product {
   status: string;
   image?: string;
   description?: string;
+  pieces_per_packet: number;
+  packets_per_carton: number;
 }
 
 interface Category {
@@ -26,11 +28,9 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   
-  // Category Form State
   const [editingCatId, setEditingCatId] = useState<number | null>(null);
   const [catName, setCatName] = useState('');
 
-  // Product Form States
   const [editingProductId, setEditingProductId] = useState<number | null>(null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState('');
@@ -41,6 +41,8 @@ export default function InventoryPage() {
   const [shopPrice, setShopPrice] = useState<number>(0);
   const [image, setImage] = useState('');
   const [description, setDescription] = useState('');
+  const [piecesPerPacket, setPiecesPerPacket] = useState<number>(1);
+  const [packetsPerCarton, setPacketsPerCarton] = useState<number>(1);
   const [status, setStatus] = useState('In Stock');
   const [message, setMessage] = useState('');
 
@@ -103,7 +105,10 @@ export default function InventoryPage() {
 
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const payload = { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description };
+    const payload = { 
+      name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, 
+      status, image, description, piecesPerPacket, packetsPerCarton 
+    };
     try {
       if (editingProductId) {
         await API.put(`/api/admin/products/${editingProductId}`, payload);
@@ -149,21 +154,24 @@ export default function InventoryPage() {
     setStatus(prod.status || 'In Stock');
     setImage(prod.image || '');
     setDescription(prod.description || '');
+    setPiecesPerPacket(prod.pieces_per_packet || 1);
+    setPacketsPerCarton(prod.packets_per_carton || 1);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetProductForm = () => {
     setEditingProductId(null);
     setName(''); setSku(''); setMrp(0); setSuperStockistPrice(0); setDistributorPrice(0); setShopPrice(0); setImage(''); setDescription('');
+    setPiecesPerPacket(1); setPacketsPerCarton(1);
   };
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto text-slate-800 bg-slate-50 min-h-screen">
       <div>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-          <Package className="w-8 h-8 text-amber-600" /> Inventory, Categories & Hierarchical Pricing
+          <Package className="w-8 h-8 text-amber-600" /> Inventory, Categories & Multi-Tier Pricing
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Manage, add, edit, and delete categories, products, and multi-tier pricing structures.</p>
+        <p className="text-sm text-slate-500 mt-1">Manage categories, product descriptions, packing ratios, and tier pricing structures.</p>
       </div>
 
       {message && <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl">{message}</div>}
@@ -205,8 +213,8 @@ export default function InventoryPage() {
               {categories.map(c => (
                 <div key={c.id} className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
                   <span>{c.name}</span>
-                  <button onClick={() => startEditCategory(c)} className="text-amber-600 hover:text-amber-700" title="Edit Category"><Edit3 className="w-3.5 h-3.5" /></button>
-                  <button onClick={() => handleDeleteCategory(c.id)} className="text-rose-600 hover:text-rose-700 ml-1" title="Delete Category"><Trash2 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => startEditCategory(c)} className="text-amber-600 hover:text-amber-700" title="Edit"><Edit3 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => handleDeleteCategory(c.id)} className="text-rose-600 hover:text-rose-700 ml-1" title="Delete"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               ))}
             </div>
@@ -263,6 +271,18 @@ export default function InventoryPage() {
               </div>
             </div>
 
+            {/* Packaging Conversion Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Pieces per Packet</label>
+                <input type="number" value={piecesPerPacket} onChange={(e) => setPiecesPerPacket(Number(e.target.value))} required className="w-full px-3 py-2 bg-white border rounded-xl text-xs outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Packets per Carton</label>
+                <input type="number" value={packetsPerCarton} onChange={(e) => setPacketsPerCarton(Number(e.target.value))} required className="w-full px-3 py-2 bg-white border rounded-xl text-xs outline-none" />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Product Image URL</label>
@@ -282,7 +302,7 @@ export default function InventoryPage() {
 
       </div>
 
-      {/* Catalog Display Grid with Edit and Delete Buttons */}
+      {/* Catalog Display Grid */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
           <Tag className="w-5 h-5 text-amber-600" /> Active Inventory Catalog
@@ -299,6 +319,12 @@ export default function InventoryPage() {
                 </div>
                 <h4 className="font-bold text-sm text-slate-900">{p.name}</h4>
                 {p.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.description}</p>}
+                
+                {/* Packaging Details Badge */}
+                <div className="mt-2 text-[11px] text-slate-600 bg-amber-50 p-2 rounded-xl border border-amber-200 flex justify-between font-semibold">
+                  <span>📦 Pack: {p.pieces_per_packet || 1} Pcs/Pkt</span>
+                  <span>📦 Carton: {p.packets_per_carton || 1} Pkts/Ctn</span>
+                </div>
               </div>
 
               <div className="space-y-3">
@@ -309,16 +335,10 @@ export default function InventoryPage() {
                 </div>
 
                 <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => startEditProduct(p)}
-                    className="py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
+                  <button onClick={() => startEditProduct(p)} className="py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer">
                     <Edit3 className="w-3.5 h-3.5 text-amber-500" /> Edit
                   </button>
-                  <button
-                    onClick={() => handleDeleteProduct(p.id)}
-                    className="py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-rose-200"
-                  >
+                  <button onClick={() => handleDeleteProduct(p.id)} className="py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-rose-200">
                     <Trash2 className="w-3.5 h-3.5" /> Delete
                   </button>
                 </div>

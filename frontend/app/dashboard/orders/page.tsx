@@ -11,6 +11,8 @@ interface Product {
   shop_price: number;
   distributor_price: number;
   super_stockist_price: number;
+  pieces_per_packet: number;
+  packets_per_carton: number;
 }
 
 interface Order {
@@ -35,7 +37,7 @@ export default function OrdersPage() {
   const [shops, setShops] = useState<ShopUser[]>([]);
   const [selectedShopId, setSelectedShopId] = useState<string>('');
   
-  const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
+  const [cart, setCart] = useState<{ product: Product; quantity: number; unitType: string }[]>([]);
   const [userRole, setUserRole] = useState<string>('');
   const [userId, setUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
@@ -84,19 +86,31 @@ export default function OrdersPage() {
     }
   };
 
+  const getEffectivePrice = (product: Product) => {
+    if (userRole === 'super_stockist') return product.super_stockist_price || product.mrp;
+    if (userRole === 'distributor') return product.distributor_price || product.mrp;
+    return product.shop_price || product.mrp;
+  };
+
+  // Super Stockists & Distributors order in Cartons. Shops order in Packets.
+  const isCartonOrdering = ['super_stockist', 'distributor'].includes(userRole);
+  const unitLabel = isCartonOrdering ? 'Cartons' : 'Packets';
+
   const addToCart = (product: Product) => {
     const existing = cart.find(item => item.product.id === product.id);
     if (existing) {
       setCart(cart.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
     } else {
-      setCart([...cart, { product, quantity: 1 }]);
+      setCart([...cart, { product, quantity: 1, unitType: unitLabel }]);
     }
   };
 
-  const getEffectivePrice = (product: Product) => {
-    if (userRole === 'super_stockist') return product.super_stockist_price || product.mrp;
-    if (userRole === 'distributor') return product.distributor_price || product.mrp;
-    return product.shop_price || product.mrp;
+  const handleQuantityChange = (productId: number, qty: number) => {
+    if (qty <= 0) {
+      setCart(cart.filter(item => item.product.id !== productId));
+    } else {
+      setCart(cart.map(item => item.product.id === productId ? { ...item, quantity: qty } : item));
+    }
   };
 
   const handlePlaceOrder = async () => {
@@ -105,16 +119,27 @@ export default function OrdersPage() {
     setMessage('');
 
     try {
-      const totalAmount = cart.reduce((sum, item) => sum + getEffectivePrice(item.product) * item.quantity, 0);
+      // Calculate total base units and corresponding price
+      const itemsPayload = cart.map(item => {
+        const p = item.product;
+        // Convert Cartons or Packets into absolute base units for fulfillment tracking
+        const multiplier = isCartonOrdering 
+          ? (p.packets_per_carton || 1) * (p.pieces_per_packet || 1) 
+          : (p.pieces_per_packet || 1);
+        
+        return {
+          productId: p.id,
+          quantity: item.quantity * multiplier,
+          unitPrice: getEffectivePrice(p)
+        };
+      });
+
+      const totalAmount = itemsPayload.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 
       const payload: any = {
         buyerId: userId,
         totalAmount,
-        items: cart.map(item => ({
-          productId: item.product.id,
-          quantity: item.quantity,
-          unitPrice: getEffectivePrice(item.product)
-        }))
+        items: itemsPayload
       };
 
       if (userRole === 'employee' && selectedShopId) {
@@ -151,7 +176,7 @@ export default function OrdersPage() {
             <ShoppingCart className="w-8 h-8 text-amber-600" /> Smart Supply Chain & Proxy Ordering
           </h1>
           <p className="text-sm text-slate-500 mt-1">
-            Portal Role: <span className="font-bold uppercase text-amber-600">{userRole}</span>. Orders route automatically based on network hierarchy.
+            Portal Role: <span className="font-bold uppercase text-amber-600">{userRole}</span>. Ordering unit: <span className="font-bold text-slate-800">{unitLabel}</span>.
           </p>
         </div>
       </div>
@@ -170,7 +195,7 @@ export default function OrdersPage() {
             <UserCheck className="w-6 h-6 text-amber-600" />
             <div>
               <h4 className="font-bold text-xs text-amber-900 uppercase">Field Employee Proxy Mode</h4>
-              <p className="text-[11px] text-amber-700">Select a retail shop below to place orders on their behalf.</p>
+              <p className="text-[11px] text-amber-700">Select a retail shop below to place packet orders on their behalf.</p>
             </div>
           </div>
           <select
@@ -187,12 +212,12 @@ export default function OrdersPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         
-        {/* Product Catalog & Ordering Section (Hidden for Admin/Superadmin unless they want to stock) */}
+        {/* Product Catalog & Ordering Section */}
         {['super_stockist', 'distributor', 'shop', 'employee'].includes(userRole) && (
           <div className="lg:col-span-2 space-y-6">
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
               <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <Package className="w-5 h-5 text-amber-600" /> Select Products to Order Upstream
+                <Package className="w-5 h-5 text-amber-600" /> Select Products ({unitLabel} Ordering)
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
@@ -201,7 +226,10 @@ export default function OrdersPage() {
                     <div>
                       <h4 className="font-bold text-xs text-slate-900">{p.name}</h4>
                       <p className="text-[10px] text-slate-400">SKU: {p.sku}</p>
-                      <p className="text-xs font-black text-amber-600 mt-1">₹{getEffectivePrice(p)}</p>
+                      <p className="text-xs font-black text-amber-600 mt-1">₹{getEffectivePrice(p)} / unit</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        📦 {p.pieces_per_packet || 1} Pcs/Pkt | {p.packets_per_carton || 1} Pkts/Ctn
+                      </p>
                     </div>
                     <button
                       onClick={() => addToCart(p)}
@@ -228,12 +256,24 @@ export default function OrdersPage() {
             ) : (
               <div className="space-y-3">
                 {cart.map((item, idx) => (
-                  <div key={idx} className="flex justify-between items-center text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <div>
+                  <div key={idx} className="flex flex-col gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div className="flex justify-between items-center">
                       <p className="font-bold text-slate-800">{item.product.name}</p>
-                      <p className="text-[10px] text-slate-500">Qty: {item.quantity} × ₹{getEffectivePrice(item.product)}</p>
+                      <span className="font-extrabold text-amber-600">₹{(item.quantity * getEffectivePrice(item.product)).toLocaleString()}</span>
                     </div>
-                    <span className="font-extrabold text-amber-600">₹{(item.quantity * getEffectivePrice(item.product)).toLocaleString()}</span>
+                    <div className="flex justify-between items-center text-[11px] text-slate-500">
+                      <span>Rate: ₹{getEffectivePrice(item.product)}</span>
+                      <div className="flex items-center gap-1">
+                        <span>Qty ({item.unitType}):</span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={(e) => handleQuantityChange(item.product.id, Number(e.target.value))}
+                          className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-center font-bold text-slate-900"
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
 
