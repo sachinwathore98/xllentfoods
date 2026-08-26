@@ -642,3 +642,49 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+// --- PARTNERSHIP ENQUIRY FORM ENDPOINT ---
+app.post('/api/partnership/enquiry', async (req, res) => {
+  try {
+    const { fullName, email, phone, roleType, location, message } = req.body;
+
+    await pool.query(
+      `INSERT INTO partnership_enquiries (full_name, email, phone, role_type, location, message) 
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [fullName, email, phone, roleType, location, message]
+    );
+
+    try {
+      if (process.env.BREVO_API_KEY) {
+        const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+        apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+
+        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
+        sendSmtpEmail.sender = { email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', name: "Xllent Foods Portal" };
+        sendSmtpEmail.to = [{ email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', name: "Admin" }];
+        sendSmtpEmail.subject = `New Partnership Enquiry: ${roleType} - ${fullName}`;
+        sendSmtpEmail.htmlContent = `
+          <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
+            <h2 style="color: #d97706; text-align: center;">New Partnership Application</h2>
+            <p>You have received a new partnership enquiry from your public website:</p>
+            <ul style="line-height: 1.6; background: #f8fafc; padding: 15px 25px; border-radius: 8px;">
+              <li><b>Full Name:</b> ${fullName}</li>
+              <li><b>Email:</b> ${email}</li>
+              <li><b>Phone:</b> ${phone}</li>
+              <li><b>Role Requested:</b> ${roleType}</li>
+              <li><b>Location:</b> ${location}</li>
+              <li><b>Message:</b> ${message || 'N/A'}</li>
+            </ul>
+          </div>
+        `;
+        await apiInstance.sendTransacEmail(sendSmtpEmail);
+      }
+    } catch (emailErr) {
+      console.error("Brevo Email Warning (Enquiry saved to DB):", emailErr.message);
+    }
+
+    res.status(201).json({ message: 'Enquiry submitted successfully! Our team will contact you shortly.' });
+  } catch (err) {
+    console.error('Partnership Enquiry Error:', err);
+    res.status(500).json({ message: 'Failed to submit enquiry. Please try again.' });
+  }
+});
