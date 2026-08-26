@@ -588,7 +588,7 @@ app.put('/api/admin/users/:id', async (req, res) => {
   }
 });
 
-// --- PARTNERSHIP ENQUIRY FORM ENDPOINT (Dual Route Support with Admin Alert & Sender Welcome Email) ---
+// --- PARTNERSHIP ENQUIRY FORM ENDPOINT ---
 const handlePartnershipEnquiry = async (req, res) => {
   try {
     const { fullName, email, phone, roleType, location, message } = req.body;
@@ -600,16 +600,21 @@ const handlePartnershipEnquiry = async (req, res) => {
       [fullName, email, phone, roleType, location, message]
     );
 
-    // 2. Send Emails via Brevo
+    // 2. Send Emails via Brevo (Compatible with @getbrevo/brevo package)
     try {
       if (process.env.BREVO_API_KEY) {
-        const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-        apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
+        let apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
+        
+        // Correct authentication assignment for newer package versions
+        let apiKey = apiInstance.authentications['apiKey'];
+        if (apiKey) {
+          apiKey.apiKey = process.env.BREVO_API_KEY;
+        }
 
         const senderEmail = process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com';
 
         // --- EMAIL A: Notification to Admin (xllentfoods91@gmail.com) ---
-        const adminEmail = new SibApiV3Sdk.SendSmtpEmail();
+        let adminEmail = new SibApiV3Sdk.SendSmtpEmail();
         adminEmail.sender = { email: senderEmail, name: "Xllent Foods Portal" };
         adminEmail.to = [{ email: senderEmail, name: "Admin" }];
         adminEmail.subject = `New Partnership Enquiry: ${roleType} - ${fullName}`;
@@ -630,7 +635,7 @@ const handlePartnershipEnquiry = async (req, res) => {
         await apiInstance.sendTransacEmail(adminEmail);
 
         // --- EMAIL B: Welcome Email to the Sender ---
-        const welcomeEmail = new SibApiV3Sdk.SendSmtpEmail();
+        let welcomeEmail = new SibApiV3Sdk.SendSmtpEmail();
         welcomeEmail.sender = { email: senderEmail, name: "Xllent Foods" };
         welcomeEmail.to = [{ email: email, name: fullName }];
         welcomeEmail.subject = "Welcome to Xllent Foods – Partnership Enquiry Received!";
@@ -650,15 +655,12 @@ const handlePartnershipEnquiry = async (req, res) => {
             <p>If you have any urgent queries, you can reach out to us directly at <a href="mailto:${senderEmail}" style="color: #d97706; text-decoration: none;">${senderEmail}</a>.</p>
             <p style="margin-top: 30px;">Warm regards,</p>
             <p style="font-weight: bold; color: #1e293b; margin-top: -10px;">The Xllent Foods Team</p>
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
-            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated message from Xllent Foods. Please do not reply directly to this email.</p>
           </div>
         `;
         await apiInstance.sendTransacEmail(welcomeEmail);
-
       }
     } catch (emailErr) {
-      console.error("Brevo Email Warning (Enquiry saved to DB):", emailErr.message);
+      console.error("Brevo Email Warning (Enquiry saved to DB):", emailErr.message || emailErr);
     }
 
     res.status(201).json({ message: 'Enquiry submitted successfully! Our team will contact you shortly.' });
