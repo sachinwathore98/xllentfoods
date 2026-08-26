@@ -8,9 +8,13 @@ require('dotenv').config();
 
 const app = express();
 
+// --- TRUST PROXY & MIDDLEWARE ---
+app.set('trust proxy', 1);
+app.use(express.json());
+
 // --- CORS CONFIGURATION ---
 const allowedOrigins = [
-  'https://xllentfoods.vercel.app',
+  'https://xellentfoods.vercel.app',
   'http://localhost:3000'
 ];
 
@@ -29,7 +33,6 @@ app.use(cors({
 }));
 
 app.options('*', cors());
-app.use(express.json());
 
 // --- SUPABASE POSTGRESQL CONNECTION ---
 const pool = new Pool({
@@ -130,6 +133,11 @@ const sendOTPEmail = async (toEmail, otpCode, recipientName = 'Partner') => {
     throw new Error("Failed to send OTP email via Brevo");
   }
 };
+
+// --- HEALTH CHECK ROUTE ---
+app.get('/', (req, res) => {
+  res.status(200).json({ status: 'online', service: 'Xllent Foods DMS Backend' });
+});
 
 // --- AUTH ROUTES ---
 app.post('/api/auth/login', async (req, res) => {
@@ -273,6 +281,12 @@ app.post('/api/partnership/enquiry', async (req, res) => {
     console.error('Enquiry Error:', err);
     res.status(500).json({ message: 'Failed to submit enquiry. Please try again later.' });
   }
+});
+
+// --- GLOBAL ERROR CATCHER ---
+app.use((err, req, res, next) => {
+  console.error('Unhandled Express Error:', err.stack);
+  res.status(500).json({ message: 'Internal server error occurred.' });
 });
 
 const PORT = process.env.PORT || 5000;
