@@ -588,27 +588,32 @@ app.put('/api/admin/users/:id', async (req, res) => {
   }
 });
 
-// --- PARTNERSHIP ENQUIRY FORM ENDPOINT (Dual Route Support for /api and root) ---
+// --- PARTNERSHIP ENQUIRY FORM ENDPOINT (Dual Route Support with Admin Alert & Sender Welcome Email) ---
 const handlePartnershipEnquiry = async (req, res) => {
   try {
     const { fullName, email, phone, roleType, location, message } = req.body;
 
+    // 1. Save to Database
     await pool.query(
       `INSERT INTO partnership_enquiries (full_name, email, phone, role_type, location, message) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [fullName, email, phone, roleType, location, message]
     );
 
+    // 2. Send Emails via Brevo
     try {
       if (process.env.BREVO_API_KEY) {
         const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
         apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
 
-        const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-        sendSmtpEmail.sender = { email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', name: "Xllent Foods Portal" };
-        sendSmtpEmail.to = [{ email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', name: "Admin" }];
-        sendSmtpEmail.subject = `New Partnership Enquiry: ${roleType} - ${fullName}`;
-        sendSmtpEmail.htmlContent = `
+        const senderEmail = process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com';
+
+        // --- EMAIL A: Notification to Admin (xllentfoods91@gmail.com) ---
+        const adminEmail = new SibApiV3Sdk.SendSmtpEmail();
+        adminEmail.sender = { email: senderEmail, name: "Xllent Foods Portal" };
+        adminEmail.to = [{ email: senderEmail, name: "Admin" }];
+        adminEmail.subject = `New Partnership Enquiry: ${roleType} - ${fullName}`;
+        adminEmail.htmlContent = `
           <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
             <h2 style="color: #d97706; text-align: center;">New Partnership Application</h2>
             <p>You have received a new partnership enquiry from your public website:</p>
@@ -622,7 +627,35 @@ const handlePartnershipEnquiry = async (req, res) => {
             </ul>
           </div>
         `;
-        await apiInstance.sendTransacEmail(sendSmtpEmail);
+        await apiInstance.sendTransacEmail(adminEmail);
+
+        // --- EMAIL B: Welcome Email to the Sender ---
+        const welcomeEmail = new SibApiV3Sdk.SendSmtpEmail();
+        welcomeEmail.sender = { email: senderEmail, name: "Xllent Foods" };
+        welcomeEmail.to = [{ email: email, name: fullName }];
+        welcomeEmail.subject = "Welcome to Xllent Foods – Partnership Enquiry Received!";
+        welcomeEmail.htmlContent = `
+          <div style="font-family: Arial, sans-serif; padding: 25px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <h2 style="color: #d97706; margin: 0;">Xllent Foods</h2>
+              <p style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Distribution Management System</p>
+            </div>
+            <p>Dear <b>${fullName}</b>,</p>
+            <p>Thank you for your interest in partnering with <b>Xllent Foods</b> as a <b>${roleType}</b> for the <b>${location}</b> region.</p>
+            <p>We have successfully received your application details. Our regional expansion team is currently reviewing your submission and will get in touch with you shortly to discuss wholesale margins, territory rights, and onboarding credentials.</p>
+            <div style="background: #f8fafc; padding: 15px 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #d97706;">
+              <p style="margin: 0; font-size: 13px; color: #475569;"><b>Submitted Application Summary:</b></p>
+              <p style="margin: 5px 0 0 0; font-size: 12px; color: #64748b;">Role: ${roleType} | Location: ${location} | Phone: ${phone}</p>
+            </div>
+            <p>If you have any urgent queries, you can reach out to us directly at <a href="mailto:${senderEmail}" style="color: #d97706; text-decoration: none;">${senderEmail}</a>.</p>
+            <p style="margin-top: 30px;">Warm regards,</p>
+            <p style="font-weight: bold; color: #1e293b; margin-top: -10px;">The Xllent Foods Team</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 25px 0;" />
+            <p style="font-size: 11px; color: #94a3b8; text-align: center; margin: 0;">This is an automated message from Xllent Foods. Please do not reply directly to this email.</p>
+          </div>
+        `;
+        await apiInstance.sendTransacEmail(welcomeEmail);
+
       }
     } catch (emailErr) {
       console.error("Brevo Email Warning (Enquiry saved to DB):", emailErr.message);
