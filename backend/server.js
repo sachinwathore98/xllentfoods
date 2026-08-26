@@ -61,6 +61,13 @@ async function initDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
 
+      -- Ensure columns exist even if table was created previously without them
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'shop';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(10);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS otp_expires TIMESTAMP;
+
       CREATE TABLE IF NOT EXISTS products (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
@@ -310,7 +317,7 @@ app.post('/api/admin/products', async (req, res) => {
 app.get('/api/admin/financial-overview', async (req, res) => {
   try {
     const productStats = await pool.query("SELECT COUNT(*) as total_products, SUM(mrp) as total_mrp_value FROM products");
-    const userStats = await pool.query("SELECT COUNT(*) as total_users WHERE role != 'superadmin'");
+    const userStats = await pool.query("SELECT COUNT(*) as total_users FROM users WHERE role != 'superadmin'");
     const enquiryStats = await pool.query("SELECT COUNT(*) as total_enquiries FROM partnership_enquiries");
 
     res.json({
