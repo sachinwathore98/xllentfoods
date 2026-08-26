@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { ShieldCheck, TrendingUp, Users, ArrowRight, Package, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, TrendingUp, Users, ArrowRight, Package, CheckCircle2, Filter } from 'lucide-react';
 
 const SLIDER_IMAGES = [
   '/images/slider-1.png',
@@ -14,6 +14,8 @@ const SLIDER_IMAGES = [
 export default function PublicHomePage() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
 
   // Auto slide effect every 4 seconds
@@ -25,12 +27,29 @@ export default function PublicHomePage() {
   }, []);
 
   useEffect(() => {
-    fetchPublicProducts();
+    fetchCategories();
+    fetchProducts('All');
   }, []);
 
-  const fetchPublicProducts = async () => {
+  const fetchCategories = async () => {
     try {
-      const res = await API.get('/products/public');
+      const res = await API.get('/categories');
+      setCategories(res.data.categories || []);
+    } catch (err) {
+      console.error("Error fetching categories", err);
+    }
+  };
+
+  const fetchProducts = async (categoryName: string) => {
+    try {
+      setLoading(true);
+      setSelectedCategory(categoryName);
+      // Fetch public products filtered by category if selected
+      const endpoint = categoryName === 'All' 
+        ? '/products/public' 
+        : `/admin/products?category=${encodeURIComponent(categoryName)}`;
+      
+      const res = await API.get(endpoint);
       setProducts(res.data.products || []);
     } catch (err) {
       console.error("Error fetching public products", err);
@@ -43,7 +62,7 @@ export default function PublicHomePage() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       <Navbar />
 
-      {/* Full-Length Responsive Image Slider without Overlap */}
+      {/* Full-Length Responsive Image Slider */}
       <section className="relative w-full overflow-hidden bg-slate-900">
         <div className="relative w-full">
           {SLIDER_IMAGES.map((img, index) => (
@@ -163,9 +182,9 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      {/* Dynamic Products Showcase Section (Displays ALL Catalog Products) */}
+      {/* Dynamic Catalog & Category Filtering Section */}
       <section id="products" className="py-20 px-6 max-w-7xl mx-auto">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-10 gap-4">
           <div>
             <span className="text-xs font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
               Official Catalog
@@ -173,15 +192,43 @@ export default function PublicHomePage() {
             <h2 className="text-3xl font-black text-slate-900 mt-3 tracking-tight">Our Complete FMCG Product Range</h2>
           </div>
           <p className="text-xs text-slate-500 max-w-md">
-            Browse our full active inventory managed directly through the administrative dashboard, featuring packaging metrics and bulk ordering tiers.
+            Explore all categories and active inventory managed directly through our administrative dashboard, ready for bulk dispatch.
           </p>
         </div>
 
+        {/* Dynamic Category Filter Buttons Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-8 scrollbar-none">
+          <button
+            onClick={() => fetchProducts('All')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-sm ${
+              selectedCategory === 'All' 
+                ? 'bg-amber-600 text-white shadow-amber-600/20' 
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+            }`}
+          >
+            All Products
+          </button>
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => fetchProducts(cat.name)}
+              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-sm ${
+                selectedCategory === cat.name 
+                  ? 'bg-amber-600 text-white shadow-amber-600/20' 
+                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Products Grid */}
         {loading ? (
-          <div className="text-center py-16 text-slate-400 text-xs font-semibold">Loading catalog items...</div>
+          <div className="text-center py-20 text-slate-400 text-xs font-semibold">Loading catalog items...</div>
         ) : products.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-semibold">
-            No products available yet. Check back soon or log in as admin to add inventory.
+          <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-semibold">
+            No products available in this category yet. Check back soon!
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
