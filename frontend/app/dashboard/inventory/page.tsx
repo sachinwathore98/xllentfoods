@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { Package, Plus, FolderPlus, Tag, Edit3, X } from 'lucide-react';
+import { Package, Plus, FolderPlus, Tag, Edit3, X, Trash2 } from 'lucide-react';
 
 interface Product {
   id: number;
@@ -89,6 +89,18 @@ export default function InventoryPage() {
     }
   };
 
+  const handleDeleteCategory = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this category?')) return;
+    try {
+      await API.delete(`/api/admin/categories/${id}`);
+      setMessage('Category deleted successfully!');
+      fetchCategories();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setMessage('Failed to delete category.');
+    }
+  };
+
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const payload = { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description };
@@ -105,6 +117,18 @@ export default function InventoryPage() {
       setTimeout(() => setMessage(''), 3000);
     } catch (err: any) {
       setMessage('Operation failed.');
+    }
+  };
+
+  const handleDeleteProduct = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this product from the catalog?')) return;
+    try {
+      await API.delete(`/api/admin/products/${id}`);
+      setMessage('Product deleted successfully!');
+      fetchProducts();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      setMessage('Failed to delete product.');
     }
   };
 
@@ -139,7 +163,7 @@ export default function InventoryPage() {
         <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
           <Package className="w-8 h-8 text-amber-600" /> Inventory, Categories & Hierarchical Pricing
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Manage, add, and edit categories, product details, and multi-tier pricing structures.</p>
+        <p className="text-sm text-slate-500 mt-1">Manage, add, edit, and delete categories, products, and multi-tier pricing structures.</p>
       </div>
 
       {message && <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl">{message}</div>}
@@ -181,7 +205,8 @@ export default function InventoryPage() {
               {categories.map(c => (
                 <div key={c.id} className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold">
                   <span>{c.name}</span>
-                  <button onClick={() => startEditCategory(c)} className="text-amber-600 hover:text-amber-700"><Edit3 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => startEditCategory(c)} className="text-amber-600 hover:text-amber-700" title="Edit Category"><Edit3 className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => handleDeleteCategory(c.id)} className="text-rose-600 hover:text-rose-700 ml-1" title="Delete Category"><Trash2 className="w-3.5 h-3.5" /></button>
                 </div>
               ))}
             </div>
@@ -257,7 +282,7 @@ export default function InventoryPage() {
 
       </div>
 
-      {/* Catalog Display Grid with Edit Button */}
+      {/* Catalog Display Grid with Edit and Delete Buttons */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
         <h3 className="font-bold text-lg text-slate-900 flex items-center gap-2">
           <Tag className="w-5 h-5 text-amber-600" /> Active Inventory Catalog
@@ -283,12 +308,20 @@ export default function InventoryPage() {
                   <div className="flex justify-between"><span>Retail Shop:</span> <span className="font-bold text-emerald-600">₹{p.shop_price}</span></div>
                 </div>
 
-                <button
-                  onClick={() => startEditProduct(p)}
-                  className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
-                >
-                  <Edit3 className="w-3.5 h-3.5 text-amber-500" /> Edit Product
-                </button>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => startEditProduct(p)}
+                    className="py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-500" /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteProduct(p.id)}
+                    className="py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-rose-200"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
               </div>
             </div>
           ))}
