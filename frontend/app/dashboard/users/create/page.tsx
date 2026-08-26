@@ -1,36 +1,61 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { MapPin } from 'lucide-react';
+import { UserPlus, MapPin, CheckCircle2, Shield } from 'lucide-react';
+
+interface UserProfile {
+  id: number;
+  name: string;
+  role: string;
+}
 
 export default function CreateUserPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [role, setRole] = useState('distributor');
+  const [password, setPassword] = useState('Admin@123');
+  const [role, setRole] = useState('shop');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [parentId, setParentId] = useState<string>('');
+  
+  const [parentsList, setParentsList] = useState<UserProfile[]>([]);
   const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const fetchCurrentLocation = () => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLatitude(position.coords.latitude);
-          setLongitude(position.coords.longitude);
-          setLocation(`Lat: ${position.coords.latitude.toFixed(4)}, Lng: ${position.coords.longitude.toFixed(4)}`);
-          setMessage('Shop GPS coordinates captured successfully from Google Maps device location.');
-        },
-        (error) => {
-          alert('Unable to retrieve device location. Ensure location permissions are granted.');
-        }
-      );
-    } else {
-      alert('Geolocation is not supported by this browser.');
+  useEffect(() => {
+    fetchPotentialParents();
+  }, []);
+
+  const fetchPotentialParents = async () => {
+    try {
+      const res = await API.get('/api/admin/users-list');
+      setParentsList(res.data.users || []);
+    } catch (err) {
+      console.error('Failed to load parent hierarchy', err);
     }
+  };
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        setLatitude(lat);
+        setLongitude(lng);
+        setLocation(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+        setMessage('GPS Location successfully pinned!');
+        setTimeout(() => setMessage(''), 3000);
+      },
+      () => {
+        alert('Unable to retrieve your location. Please check permissions.');
+      }
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,140 +64,166 @@ export default function CreateUserPage() {
     setMessage('');
 
     try {
-      const userStr = localStorage.getItem('user');
-      const currentUser = userStr ? JSON.parse(userStr) : null;
-
       await API.post('/api/admin/users/create', {
         name,
         email,
         password,
         role,
         phone,
-        location,
-        latitude,
-        longitude,
-        parentId: currentUser?.id || null
+        location: role === 'shop' ? location : null,
+        latitude: role === 'shop' ? latitude : null,
+        longitude: role === 'shop' ? longitude : null,
+        parentId: parentId ? Number(parentId) : null
       });
-      setMessage('User account provisioned successfully and linked to hierarchy!');
+
+      setMessage(`Successfully provisioned new ${role} account for ${name}!`);
       setName('');
       setEmail('');
-      setPassword('');
       setPhone('');
       setLocation('');
       setLatitude(null);
       setLongitude(null);
+      setTimeout(() => setMessage(''), 4000);
     } catch (err: any) {
-      setMessage(err.response?.data?.message || 'Failed to create user account.');
+      alert(err.response?.data?.message || 'Failed to create user account.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-8 max-w-3xl mx-auto bg-slate-50 min-h-screen">
-      <div className="bg-white p-8 rounded-xl shadow-sm border border-slate-100">
-        <h1 className="text-2xl font-black text-slate-900 mb-1">Provision Downline User & Shop Geolocation</h1>
-        <p className="text-sm text-slate-500 mb-6">Create accounts for network tiers (Super Stockist, Distributor, Shop, Employee) with GPS map tagging.</p>
+    <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto text-slate-800 bg-slate-50 min-h-screen">
+      <div>
+        <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <UserPlus className="w-8 h-8 text-amber-600" /> Provision Downline User & Geolocation
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">Create accounts for network tiers. GPS mapping is enabled exclusively for Retail Shops.</p>
+      </div>
 
-        {message && (
-          <div className={`p-4 mb-6 rounded-lg text-sm font-medium ${message.includes('success') || message.includes('captured') ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'}`}>
-            {message}
-          </div>
-        )}
+      {message && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>{message}</span>
+        </div>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Full Name</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name</label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 required
-                className="w-full px-3 py-2 border rounded-lg text-sm text-black outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="Partner Name"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Email Address</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Email Address</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-3 py-2 border rounded-lg text-sm text-black outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="partner@xllent.com"
+                placeholder="partner@xellent.com"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Temporary Password</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Temporary Password</label>
               <input
-                type="password"
+                type="text"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-3 py-2 border rounded-lg text-sm text-black outline-none focus:ring-2 focus:ring-amber-500"
-                placeholder="••••••••"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Assign Role Tier</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Assign Role Tier</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm text-black bg-white outline-none focus:ring-2 focus:ring-amber-500"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               >
                 <option value="super_stockist">Super Stockist</option>
                 <option value="distributor">Distributor</option>
-                <option value="shop">Shop / Retailer</option>
+                <option value="shop">Retail Shop</option>
                 <option value="employee">Field Employee</option>
+                <option value="admin">Admin</option>
               </select>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Phone Number</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number</label>
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                required
-                className="w-full px-3 py-2 border rounded-lg text-sm text-black outline-none focus:ring-2 focus:ring-amber-500"
                 placeholder="9876543210"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
+
+            {/* Parent Account Mapping */}
             <div>
-              <label className="block text-xs font-semibold text-slate-600 uppercase mb-1">Shop Address / GPS Coordinates</label>
-              <div className="flex gap-2">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Assign Parent Uplink (Optional)</label>
+              <select
+                value={parentId}
+                onChange={(e) => setParentId(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+              >
+                <option value="">-- No Direct Parent Uplink --</option>
+                {parentsList.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.role.toUpperCase()})</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Conditional Google Maps / GPS Tagging Section: ONLY for Retail Shops */}
+          {role === 'shop' && (
+            <div className="p-6 bg-amber-50/50 border border-amber-200 rounded-2xl space-y-4">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-5 h-5 text-amber-600" />
+                <h4 className="font-bold text-xs uppercase text-amber-900">Retail Shop GPS Geolocation</h4>
+              </div>
+              
+              <div className="flex flex-col md:flex-row gap-3">
                 <input
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  required
-                  className="w-full px-3 py-2 border rounded-lg text-sm text-black outline-none focus:ring-2 focus:ring-amber-500"
-                  placeholder="Location or Pin GPS"
+                  placeholder="Click 'Pin GPS' to auto-detect coordinates"
+                  className="w-full px-4 py-3 bg-white border border-amber-300 rounded-xl text-xs outline-none"
                 />
                 <button
                   type="button"
-                  onClick={fetchCurrentLocation}
-                  className="bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 hover:bg-slate-800 transition"
+                  onClick={handleGetLocation}
+                  className="px-6 py-3 bg-slate-900 hover:bg-amber-600 text-white font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shrink-0 cursor-pointer shadow-md"
                 >
-                  <MapPin className="w-4 h-4 text-amber-500" /> Pin GPS
+                  <MapPin className="w-4 h-4 text-amber-400" /> Pin GPS
                 </button>
               </div>
             </div>
-          </div>
+          )}
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-amber-600 text-white font-semibold py-2.5 rounded-lg hover:bg-amber-700 transition-colors mt-4 disabled:opacity-50"
+            className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-extrabold rounded-2xl text-sm transition shadow-lg shadow-amber-600/20 cursor-pointer disabled:opacity-50"
           >
-            {loading ? 'Provisioning Account...' : 'Create User Account & Save Location'}
+            {loading ? 'Provisioning Account...' : 'Create User Account & Save'}
           </button>
         </form>
       </div>
