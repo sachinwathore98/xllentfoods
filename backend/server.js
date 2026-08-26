@@ -540,3 +540,58 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+// --- FETCH DOWNLINE USERS SCOPED BY PARENT ID ---
+app.get('/api/admin/downline-users', async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    if (role === 'admin' || role === 'superadmin') {
+      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role != 'superadmin' ORDER BY role, name ASC");
+      return res.json({ users: result.rows });
+    }
+
+    // For Super Stockists or Distributors, fetch recursive or direct downline
+    const result = await pool.query(`
+      WITH RECURSIVE downline AS (
+        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1
+        UNION
+        SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
+        JOIN downline d ON u.parent_id = d.id
+      )
+      SELECT * FROM downline ORDER BY role, name ASC
+    `, [userId]);
+
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error('Fetch Downline Users Error:', err);
+    res.status(500).json({ message: 'Failed to fetch downline users' });
+  }
+});
+
+// --- UPDATE DOWNLINE USER DETAILS & PASSWORD ---
+app.put('/api/admin/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, location, password } = req.body;
+
+    if (password && password.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const result = await pool.query(
+        `UPDATE users SET name = $1, email = $2, phone = $3, location = $4, password = $5 WHERE id = $6 RETURNING id, name, email, role`,
+        [name, email, phone, location, hashedPassword, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+      return res.json({ message: 'User profile and password updated successfully', user: result.rows[0] });
+    } else {
+      const result = await pool.query(
+        `UPDATE users SET name = $1, email = $2, phone = $3, location = $4 WHERE id = $5 RETURNING id, name, email, role`,
+        [name, email, phone, location, id]
+      );
+      if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+      return res.json({ message: 'User profile updated successfully', user: result.rows[0] });
+    }
+  } catch (err) {
+    console.error('Update User Error:', err);
+    res.status(500).json({ message: 'Failed to update user' });
+  }
+});
