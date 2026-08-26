@@ -163,17 +163,17 @@ export default function PublicHomePage() {
         </div>
       </section>
 
-      {/* Dynamic Products Showcase Section */}
+      {/* Dynamic Products Showcase Section (Displays ALL Catalog Products) */}
       <section id="products" className="py-20 px-6 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-12 gap-4">
           <div>
             <span className="text-xs font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
               Official Catalog
             </span>
-            <h2 className="text-3xl font-black text-slate-900 mt-3 tracking-tight">Our FMCG Product Range</h2>
+            <h2 className="text-3xl font-black text-slate-900 mt-3 tracking-tight">Our Complete FMCG Product Range</h2>
           </div>
           <p className="text-xs text-slate-500 max-w-md">
-            High-quality consumer products added and managed directly through our administrative dashboard, ready for bulk dispatch.
+            Browse our full active inventory managed directly through the administrative dashboard, featuring packaging metrics and bulk ordering tiers.
           </p>
         </div>
 
@@ -186,7 +186,7 @@ export default function PublicHomePage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {products.map((product) => (
-              <div key={product._id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
+              <div key={product.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
                 <div>
                   <div className="h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                     {product.image ? (
@@ -201,6 +201,12 @@ export default function PublicHomePage() {
                   <div className="p-5">
                     <h3 className="font-extrabold text-slate-900 text-base">{product.name}</h3>
                     <p className="text-xs text-slate-500 mt-1 line-clamp-2">{product.description || 'Premium quality product manufactured for high consumer demand.'}</p>
+                    
+                    {/* Packing specifications badge */}
+                    <div className="mt-3 text-[10px] text-slate-600 bg-amber-50 p-2 rounded-xl border border-amber-100 flex justify-between font-semibold">
+                      <span>📦 Pack: {product.pieces_per_packet || 1} Pcs/Pkt</span>
+                      <span>📦 Carton: {product.packets_per_carton || 1} Pkts/Ctn</span>
+                    </div>
                   </div>
                 </div>
                 <div className="p-5 pt-0 flex justify-between items-center border-t border-slate-100 mt-4">
