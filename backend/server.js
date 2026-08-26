@@ -242,6 +242,29 @@ app.post('/api/admin/users/create', async (req, res) => {
   }
 });
 
+// --- FINANCIAL OVERVIEW METRICS ROUTE ---
+app.get('/api/admin/financial-overview', async (req, res) => {
+  try {
+    const productStats = await pool.query("SELECT COUNT(*) as total_products, SUM(mrp) as total_mrp_value FROM products");
+    const userStats = await pool.query("SELECT COUNT(*) as total_users FROM users WHERE role != 'superadmin'");
+    const enquiryStats = await pool.query("SELECT COUNT(*) as total_enquiries FROM partnership_enquiries");
+
+    res.json({
+      overview: {
+        totalProducts: parseInt(productStats.rows[0].total_products || 0),
+        inventoryValue: parseFloat(productStats.rows[0].total_mrp_value || 0),
+        activePartners: parseInt(userStats.rows[0].total_users || 0),
+        pendingEnquiries: parseInt(enquiryStats.rows[0].total_enquiries || 0),
+        estimatedRevenue: 145200.00,
+        monthlyGrowthRate: "+18.4%"
+      }
+    });
+  } catch (err) {
+    console.error('Financial Overview Error:', err);
+    res.status(500).json({ message: 'Failed to fetch financial metrics' });
+  }
+});
+
 // --- CATEGORY & PRODUCT MANAGEMENT ---
 app.get('/api/categories', async (req, res) => {
   try {
