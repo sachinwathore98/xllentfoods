@@ -87,13 +87,15 @@ async function initDatabase() {
         distributor_price NUMERIC(10,2) DEFAULT 0,
         shop_price NUMERIC(10,2) DEFAULT 0,
         status VARCHAR(50) DEFAULT 'In Stock',
-        image TEXT
+        image TEXT,
+        description TEXT
       );
 
       ALTER TABLE products ADD COLUMN IF NOT EXISTS super_stockist_price NUMERIC(10,2) DEFAULT 0;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS distributor_price NUMERIC(10,2) DEFAULT 0;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_price NUMERIC(10,2) DEFAULT 0;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
 
       CREATE TABLE IF NOT EXISTS downline_pricing_overrides (
         id SERIAL PRIMARY KEY,
@@ -289,13 +291,13 @@ app.get('/api/products/public', async (req, res) => {
 
 app.post('/api/admin/products', async (req, res) => {
   try {
-    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image } = req.body;
+    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description } = req.body;
     const result = await pool.query(
-      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image]
+      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image, description) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description]
     );
-    res.status(201).json({ message: 'Product added with tier pricing successfully', product: result.rows[0] });
+    res.status(201).json({ message: 'Product added successfully with tier pricing and description', product: result.rows[0] });
   } catch (err) {
     console.error('Add Product Error:', err);
     res.status(500).json({ message: 'Failed to add product' });
