@@ -533,13 +533,6 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-app.use((err, req, res, next) => {
-  console.error('Unhandled Express Error:', err.stack);
-  res.status(500).json({ message: 'Internal server error occurred.' });
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
 // --- FETCH DOWNLINE USERS SCOPED BY PARENT ID ---
 app.get('/api/admin/downline-users', async (req, res) => {
   try {
@@ -550,7 +543,6 @@ app.get('/api/admin/downline-users', async (req, res) => {
       return res.json({ users: result.rows });
     }
 
-    // For Super Stockists or Distributors, fetch recursive or direct downline
     const result = await pool.query(`
       WITH RECURSIVE downline AS (
         SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1
@@ -595,19 +587,18 @@ app.put('/api/admin/users/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to update user' });
   }
 });
+
 // --- PARTNERSHIP ENQUIRY FORM ENDPOINT ---
 app.post('/api/partnership/enquiry', async (req, res) => {
   try {
     const { fullName, email, phone, roleType, location, message } = req.body;
 
-    // 1. Insert into Supabase database table 'partnership_enquiries'
     await pool.query(
       `INSERT INTO partnership_enquiries (full_name, email, phone, role_type, location, message) 
        VALUES ($1, $2, $3, $4, $5, $6)`,
       [fullName, email, phone, roleType, location, message]
     );
 
-    // 2. Send notification email via Brevo to admin/support
     try {
       const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
       apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
@@ -643,3 +634,11 @@ app.post('/api/partnership/enquiry', async (req, res) => {
     res.status(500).json({ message: 'Failed to submit enquiry. Please try again.' });
   }
 });
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled Express Error:', err.stack);
+  res.status(500).json({ message: 'Internal server error occurred.' });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
