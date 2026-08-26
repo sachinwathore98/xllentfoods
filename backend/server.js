@@ -482,3 +482,60 @@ app.delete('/api/admin/products/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete product' });
   }
 });
+
+// --- FETCH USERS FOR PRICING MATRIX ---
+app.get('/api/admin/users-list', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, name, email, role, location FROM users WHERE role != 'superadmin' ORDER BY role, name ASC");
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error('Fetch Users List Error:', err);
+    res.status(500).json({ message: 'Failed to fetch users list' });
+  }
+});
+
+// --- FETCH SPECIFIC USER'S CUSTOM PRICING OVERRIDES ---
+app.get('/api/downline-pricing/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(`
+      p.id as product_id, p.name, p.sku, p.category, p.mrp, 
+      p.super_stockist_price, p.distributor_price, p.shop_price,
+      COALESCE(d.custom_price, 
+        CASE 
+          WHEN u.role = 'super_stockist' THEN p.super_stockist_price
+          WHEN u.role = 'distributor' THEN p.distributor_price
+          ELSE p.shop_price
+        END
+      ) as effective_price,
+      d.custom_price
+      FROM products p
+      CROSS JOIN users u
+      LEFT JOIN downline_pricing_overrides d ON d.product_id = p.id AND d.user_id = $1
+      WHERE u.id = $1
+      ORDER BY p.category, p.name ASC
+    `, [userId]);
+    res.json({ pricing: result.rows });
+  } catch (err) {
+    console.error('Fetch User Pricing Error:', err);
+    res.status(500).json({ message: 'Failed to fetch user pricing' });
+  }
+});
+
+// --- UPDATE PER-USER PER-PRODUCT CUSTOM PRICE ---
+app.post('/api/downline-pricing/set-user-price', async (req, res) => {
+  try {
+    const { userId, productId, customPrice } = req.body;
+    await pool.query(`
+      INSERT INTO downline_pricing_overrides (user_id, product_id, custom_price)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id, product_id)
+      DO UPDATE SET custom_price = EXCLUDED.custom_price
+    `, [userId, productId, customPrice]);
+
+    res.json({ message: 'User-specific product pricing successfully updated' });
+  } catch (err) {
+    console.error('User Pricing Override Error:', err);
+    res.status(500).json({ message: 'Failed to update user pricing override' });
+  }
+});
