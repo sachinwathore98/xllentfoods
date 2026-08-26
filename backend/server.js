@@ -44,7 +44,7 @@ pool.connect()
   .then(() => console.log('Supabase PostgreSQL Connected Successfully'))
   .catch((err) => console.error('Supabase connection error:', err));
 
-// --- INITIALIZE TABLES & SEED SUPERADMIN ---
+// --- INITIALIZE TABLES & SEED SUPERADMIN & PRICING TIERS ---
 async function initDatabase() {
   try {
     await pool.query(`
@@ -81,6 +81,34 @@ async function initDatabase() {
         message TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      CREATE TABLE IF NOT EXISTS orders (
+        id SERIAL PRIMARY KEY,
+        buyer_id INT REFERENCES users(id),
+        total_amount NUMERIC(10,2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'Pending',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      CREATE TABLE IF NOT EXISTS order_items (
+        id SERIAL PRIMARY KEY,
+        order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+        product_id INT REFERENCES products(id),
+        quantity INT NOT NULL,
+        unit_price NUMERIC(10,2) NOT NULL
+      );
+
+      CREATE TABLE IF NOT EXISTS pricing_tiers (
+        id SERIAL PRIMARY KEY,
+        tier_key VARCHAR(50) UNIQUE NOT NULL,
+        role_name VARCHAR(100) NOT NULL,
+        description TEXT,
+        base_discount NUMERIC(5,2) NOT NULL,
+        min_order_value NUMERIC(12,2) NOT NULL,
+        payment_terms VARCHAR(100) NOT NULL,
+        status VARCHAR(50) DEFAULT 'Active',
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
     `);
 
     // Seed default superadmin if not exists
@@ -92,6 +120,23 @@ async function initDatabase() {
         ['Super Admin', 'superadmin@xllentfoods.com', hashedPassword, 'superadmin', '9999999999']
       );
       console.log('Default SuperAdmin seeded: superadmin@xllentfoods.com / Admin@123');
+    }
+
+    // Seed default pricing tiers if not exists
+    const tierCheck = await pool.query("SELECT * FROM pricing_tiers");
+    if (tierCheck.rows.length === 0) {
+      const defaultTiers = [
+        ['tier-1', 'Super Stockist', 'Highest tier partner managing regional distribution hubs.', 35, 500000, 'Net 45 Days', 'Active'],
+        ['tier-2', 'Distributor', 'Zonal partners supplying regional retail networks.', 25, 200000, 'Net 30 Days', 'Active'],
+        ['tier-3', 'Retail Shop', 'Direct-to-consumer storefronts and local shops.', 15, 25000, 'Immediate / COD', 'Active']
+      ];
+      for (let t of defaultTiers) {
+        await pool.query(
+          "INSERT INTO pricing_tiers (tier_key, role_name, description, base_discount, min_order_value, payment_terms, status) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+          t
+        );
+      }
+      console.log('Default pricing tiers seeded successfully');
     }
   } catch (err) {
     console.error('Error initializing database tables:', err);
@@ -203,7 +248,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-// --- PRODUCT ROUTES (WITH CATEGORY SUPPORT) ---
+// --- PRODUCT ROUTES ---
 app.get('/api/admin/products', async (req, res) => {
   try {
     const { category } = req.query;
@@ -237,6 +282,16 @@ app.get('/api/admin/products', async (req, res) => {
   }
 });
 
+app.get('/api/products/public', async (req, res) => {
+  try {
+    let result = await pool.query("SELECT * FROM products");
+    res.json({ products: result.rows });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error loading products' });
+  }
+});
+
 app.post('/api/admin/products', async (req, res) => {
   try {
     const { name, category, sku, mrp, status, image } = req.body;
@@ -255,7 +310,7 @@ app.post('/api/admin/products', async (req, res) => {
 app.get('/api/admin/financial-overview', async (req, res) => {
   try {
     const productStats = await pool.query("SELECT COUNT(*) as total_products, SUM(mrp) as total_mrp_value FROM products");
-    const userStats = await pool.query("SELECT COUNT(*) as total_users FROM users WHERE role != 'superadmin'");
+    const userStats = await pool.query("SELECT COUNT(*) as total_users WHERE role != 'superadmin'");
     const enquiryStats = await pool.query("SELECT COUNT(*) as total_enquiries FROM partnership_enquiries");
 
     res.json({
@@ -316,18 +371,7 @@ app.post('/api/partnership/enquiry', async (req, res) => {
   }
 });
 
-// --- GLOBAL ERROR CATCHER ---
-app.use((err, req, res, next) => {
-  console.error('Unhandled Express Error:', err.stack);
-  res.status(500).json({ message: 'Internal server error occurred.' });
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-
 // --- ORDERS & FULFILLMENT ROUTES ---
-
-// Get all orders (filtered by role if needed)
 app.get('/api/orders', async (req, res) => {
   try {
     const result = await pool.query(`
@@ -343,10 +387,9 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-// Create a new order
 app.post('/api/orders', async (req, res) => {
   try {
-    const { buyerId, items, totalAmount } = req.body; // items = [{ productId, quantity, unitPrice }]
+    const { buyerId, items, totalAmount } = req.body; 
     
     const orderResult = await pool.query(
       "INSERT INTO orders (buyer_id, total_amount, status) VALUES ($1, $2, $3) RETURNING id",
@@ -368,7 +411,6 @@ app.post('/api/orders', async (req, res) => {
   }
 });
 
-// Update order status (Dispatch / Deliver)
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -381,3 +423,124 @@ app.put('/api/orders/:id/status', async (req, res) => {
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
+
+// --- PRICING TIERS ROUTES ---
+app.get('/api/admin/pricing-tiers', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM pricing_tiers ORDER BY id ASC");
+    res.json({ tiers: result.rows });
+  } catch (err) {
+    console.error('Fetch Pricing Tiers Error:', err);
+    res.status(500).json({ message: 'Failed to fetch pricing tiers' });
+  }
+});
+
+app.put('/api/admin/pricing-tiers/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { baseDiscount, minOrderValue, paymentTerms, status } = req.body;
+
+    const result = await pool.query(
+      `UPDATE pricing_tiers 
+       SET base_discount = $1, min_order_value = $2, payment_terms = $3, status = $4, updated_at = CURRENT_TIMESTAMP 
+       WHERE id = $5 RETURNING *`,
+      [baseDiscount, minOrderValue, paymentTerms, status, id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Pricing tier not found' });
+    }
+
+    res.json({ message: 'Pricing tier updated successfully', tier: result.rows[0] });
+  } catch (err) {
+    console.error('Update Pricing Tier Error:', err);
+    res.status(500).json({ message: 'Failed to update pricing tier' });
+  }
+});
+
+// --- PARTNERSHIP ENQUIRY MANAGEMENT ROUTES ---
+app.get('/api/admin/enquiries', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM partnership_enquiries ORDER BY created_at DESC");
+    res.json({ enquiries: result.rows });
+  } catch (err) {
+    console.error('Fetch Enquiries Error:', err);
+    res.status(500).json({ message: 'Failed to fetch partnership enquiries' });
+  }
+});
+
+app.post('/api/admin/enquiries/:id/approve', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { assignedRole, temporaryPassword } = req.body;
+
+    const enquiryResult = await pool.query("SELECT * FROM partnership_enquiries WHERE id = $1", [id]);
+    if (enquiryResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Enquiry not found' });
+    }
+    const enquiry = enquiryResult.rows[0];
+
+    const existingUser = await pool.query("SELECT * FROM users WHERE email = $1", [enquiry.email]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ message: 'A user account with this email already exists.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(temporaryPassword || 'Admin@123', 10);
+    const userResult = await pool.query(
+      "INSERT INTO users (name, email, password, role, phone, location) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role",
+      [enquiry.full_name, enquiry.email, hashedPassword, assignedRole || 'distributor', enquiry.phone, enquiry.location]
+    );
+
+    await pool.query("DELETE FROM partnership_enquiries WHERE id = $1", [id]);
+
+    res.status(201).json({ 
+      message: 'Enquiry approved and converted into an active user account successfully!', 
+      user: userResult.rows[0] 
+    });
+  } catch (err) {
+    console.error('Approve Enquiry Error:', err);
+    res.status(500).json({ message: 'Failed to approve and convert enquiry' });
+  }
+});
+
+// --- ORDER INVOICE DETAILS ROUTE ---
+app.get('/api/orders/:id/invoice', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const orderResult = await pool.query(`
+      SELECT o.id, o.total_amount, o.status, o.created_at, u.name as buyer_name, u.email as buyer_email, u.phone as buyer_phone, u.location as buyer_location 
+      FROM orders o
+      JOIN users u ON o.buyer_id = u.id
+      WHERE o.id = $1
+    `, [id]);
+
+    if (orderResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Order not found' });
+    }
+
+    const itemsResult = await pool.query(`
+      SELECT oi.quantity, oi.unit_price, p.name as product_name, p.sku 
+      FROM order_items oi
+      JOIN products p ON oi.product_id = p.id
+      WHERE oi.order_id = $1
+    `, [id]);
+
+    res.json({
+      order: orderResult.rows[0],
+      items: itemsResult.rows
+    });
+  } catch (err) {
+    console.error('Fetch Invoice Error:', err);
+    res.status(500).json({ message: 'Failed to generate invoice data' });
+  }
+});
+
+// --- GLOBAL ERROR CATCHER ---
+app.use((err, req, res, next) => {
+  console.error('Unhandled Express Error:', err.stack);
+  res.status(500).json({ message: 'Internal server error occurred.' });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));

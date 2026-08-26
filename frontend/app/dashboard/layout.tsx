@@ -30,15 +30,26 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       const user: UserProfile = JSON.parse(userStr);
       setUserRole(user.role);
       setUserName(user.name);
+
+      // --- ROLE-BASED ROUTE GUARDING ---
+      // Restrict lower-tier roles (shop, employee) from accessing admin-only pages
+      const adminOnlyPaths = ['/dashboard/pricing', '/dashboard/enquiries', '/dashboard/users/create'];
+      const restrictedForLowTiers = ['shop', 'employee'];
+
+      if (restrictedForLowTiers.includes(user.role) && adminOnlyPaths.some(path => pathname?.startsWith(path))) {
+        router.push('/dashboard/orders'); // Redirect unauthorized roles to their allowed orders portal
+      }
+
     } catch (e) {
       router.push('/login');
     }
-  }, [router]);
+  }, [router, pathname]);
 
   const navLinks = [
     { name: 'Overview', href: '/dashboard/overview', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
     { name: 'Inventory & Stock', href: '/dashboard/inventory', roles: ['superadmin', 'admin', 'super_stockist'] },
     { name: 'Pricing Tiers', href: '/dashboard/pricing', roles: ['superadmin', 'admin'] },
+    { name: 'Partnership Enquiries', href: '/dashboard/enquiries', roles: ['superadmin', 'admin'] },
     { name: 'Orders & Fulfillment', href: '/dashboard/orders', roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
     { name: 'Create Downline User', href: '/dashboard/users/create', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
   ];
