@@ -32,11 +32,19 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       setUserName(user.name);
 
       // --- STRICT ROLE-BASED ROUTE GUARDING ---
-      const adminOnlyPaths = ['/dashboard/pricing', '/dashboard/enquiries', '/dashboard/users/create'];
-      const restrictedForLowTiers = ['shop', 'employee'];
+      const adminOnlyPaths = ['/dashboard/enquiries', '/dashboard/pricing'];
+      const shopOrEmployeeRestricted = ['/dashboard/inventory', '/dashboard/pricing', '/dashboard/enquiries'];
 
-      if (restrictedForLowTiers.includes(user.role) && adminOnlyPaths.some(path => pathname?.startsWith(path))) {
+      if (['shop'].includes(user.role) && shopOrEmployeeRestricted.some(path => pathname?.startsWith(path))) {
         router.push('/dashboard/orders');
+      }
+
+      if (['employee'].includes(user.role) && ['/dashboard/inventory', '/dashboard/pricing', '/dashboard/enquiries', '/dashboard/overview'].some(path => pathname?.startsWith(path))) {
+        router.push('/dashboard/orders');
+      }
+
+      if (['super_stockist', 'distributor'].includes(user.role) && adminOnlyPaths.some(path => pathname?.startsWith(path))) {
+        router.push('/dashboard/overview');
       }
 
     } catch (e) {
@@ -44,13 +52,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
   }, [router, pathname]);
 
+  // Role-Specific Navigation Link Matrix
   const navLinks = [
     { name: 'Overview', href: '/dashboard/overview', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
-    { name: 'Inventory & Catalog', href: '/dashboard/inventory', roles: ['superadmin', 'admin', 'super_stockist'] },
-    { name: 'Custom Pricing', href: '/dashboard/pricing', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Inventory & Catalog', href: '/dashboard/inventory', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Downstream Pricing', href: '/dashboard/pricing', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
     { name: 'Partnership Enquiries', href: '/dashboard/enquiries', roles: ['superadmin', 'admin'] },
     { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
-    { name: 'Provision Downline User', href: '/dashboard/users/create', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Provision Shop / User', href: '/dashboard/users/create', roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'employee'] },
   ];
 
   return (
