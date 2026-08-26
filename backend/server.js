@@ -44,7 +44,7 @@ pool.connect()
   .then(() => console.log('Supabase PostgreSQL Connected Successfully'))
   .catch((err) => console.error('Supabase connection error:', err));
 
-// --- INITIALIZE TABLES & SEED SUPERADMIN & PRICING TIERS ---
+// --- INITIALIZE TABLES & SEED SUPERADMIN & CATEGORIES ---
 async function initDatabase() {
   try {
     await pool.query(`
@@ -83,17 +83,25 @@ async function initDatabase() {
         category VARCHAR(100) NOT NULL,
         sku VARCHAR(100) NOT NULL,
         mrp NUMERIC(10,2) NOT NULL,
+        super_stockist_price NUMERIC(10,2) DEFAULT 0,
+        distributor_price NUMERIC(10,2) DEFAULT 0,
+        shop_price NUMERIC(10,2) DEFAULT 0,
         status VARCHAR(50) DEFAULT 'In Stock',
         image TEXT
       );
 
-      CREATE TABLE IF NOT EXISTS product_pricing (
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS super_stockist_price NUMERIC(10,2) DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS distributor_price NUMERIC(10,2) DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS shop_price NUMERIC(10,2) DEFAULT 0;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS image TEXT;
+
+      CREATE TABLE IF NOT EXISTS downline_pricing_overrides (
         id SERIAL PRIMARY KEY,
         product_id INT REFERENCES products(id) ON DELETE CASCADE,
-        role_target VARCHAR(50) NOT NULL,
-        owner_id INT REFERENCES users(id),
+        owner_id INT REFERENCES users(id) ON DELETE CASCADE,
+        target_role VARCHAR(50) NOT NULL,
         custom_price NUMERIC(10,2) NOT NULL,
-        UNIQUE(product_id, role_target, owner_id)
+        UNIQUE(product_id, owner_id, target_role)
       );
 
       CREATE TABLE IF NOT EXISTS partnership_enquiries (
@@ -122,18 +130,6 @@ async function initDatabase() {
         product_id INT REFERENCES products(id),
         quantity INT NOT NULL,
         unit_price NUMERIC(10,2) NOT NULL
-      );
-
-      CREATE TABLE IF NOT EXISTS pricing_tiers (
-        id SERIAL PRIMARY KEY,
-        tier_key VARCHAR(50) UNIQUE NOT NULL,
-        role_name VARCHAR(100) NOT NULL,
-        description TEXT,
-        base_discount NUMERIC(5,2) NOT NULL,
-        min_order_value NUMERIC(12,2) NOT NULL,
-        payment_terms VARCHAR(100) NOT NULL,
-        status VARCHAR(50) DEFAULT 'Active',
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -293,31 +289,34 @@ app.get('/api/products/public', async (req, res) => {
 
 app.post('/api/admin/products', async (req, res) => {
   try {
-    const { name, category, sku, mrp, status, image } = req.body;
+    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image } = req.body;
     const result = await pool.query(
-      "INSERT INTO products (name, category, sku, mrp, status, image) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-      [name, category, sku, mrp, status || 'In Stock', image]
+      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image]
     );
-    res.status(201).json({ message: 'Product added successfully', product: result.rows[0] });
+    res.status(201).json({ message: 'Product added with tier pricing successfully', product: result.rows[0] });
   } catch (err) {
+    console.error('Add Product Error:', err);
     res.status(500).json({ message: 'Failed to add product' });
   }
 });
 
-// --- PRICING BRACKETS ---
-app.post('/api/pricing/set', async (req, res) => {
+// --- DOWNLINE PRICING OVERRIDES ---
+app.post('/api/downline-pricing/set', async (req, res) => {
   try {
-    const { productId, roleTarget, ownerId, customPrice } = req.body;
+    const { productId, ownerId, targetRole, customPrice } = req.body;
     await pool.query(`
-      INSERT INTO product_pricing (product_id, role_target, owner_id, custom_price)
+      INSERT INTO downline_pricing_overrides (product_id, owner_id, target_role, custom_price)
       VALUES ($1, $2, $3, $4)
-      ON CONFLICT (product_id, role_target, owner_id) 
+      ON CONFLICT (product_id, owner_id, target_role)
       DO UPDATE SET custom_price = EXCLUDED.custom_price
-    `, [productId, roleTarget, ownerId, customPrice]);
+    `, [productId, ownerId, targetRole, customPrice]);
 
-    res.json({ message: 'Pricing bracket updated successfully' });
+    res.json({ message: 'Downline pricing successfully updated' });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to set pricing' });
+    console.error('Pricing Override Error:', err);
+    res.status(500).json({ message: 'Failed to update pricing override' });
   }
 });
 
