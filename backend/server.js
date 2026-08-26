@@ -100,11 +100,12 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS downline_pricing_overrides (
         id SERIAL PRIMARY KEY,
         product_id INT REFERENCES products(id) ON DELETE CASCADE,
-        owner_id INT REFERENCES users(id) ON DELETE CASCADE,
-        target_role VARCHAR(50) NOT NULL,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
         custom_price NUMERIC(10,2) NOT NULL,
-        UNIQUE(product_id, owner_id, target_role)
+        UNIQUE(product_id, user_id)
       );
+
+      ALTER TABLE downline_pricing_overrides ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE CASCADE;
 
       CREATE TABLE IF NOT EXISTS partnership_enquiries (
         id SERIAL PRIMARY KEY,
@@ -327,100 +328,6 @@ app.post('/api/admin/products', async (req, res) => {
   }
 });
 
-// --- DOWNLINE PRICING OVERRIDES ---
-app.post('/api/downline-pricing/set', async (req, res) => {
-  try {
-    const { productId, ownerId, targetRole, customPrice } = req.body;
-    await pool.query(`
-      INSERT INTO downline_pricing_overrides (product_id, owner_id, target_role, custom_price)
-      VALUES ($1, $2, $3, $4)
-      ON CONFLICT (product_id, owner_id, target_role)
-      DO UPDATE SET custom_price = EXCLUDED.custom_price
-    `, [productId, ownerId, targetRole, customPrice]);
-
-    res.json({ message: 'Downline pricing successfully updated' });
-  } catch (err) {
-    console.error('Pricing Override Error:', err);
-    res.status(500).json({ message: 'Failed to update pricing override' });
-  }
-});
-
-// --- SMART ORDER ROUTING & FULFILLMENT ---
-app.get('/api/orders', async (req, res) => {
-  try {
-    const result = await pool.query(`
-      SELECT o.id, o.total_amount, o.status, o.created_at, u.name as buyer_name, u.email as buyer_email 
-      FROM orders o
-      JOIN users u ON o.buyer_id = u.id
-      ORDER BY o.created_at DESC
-    `);
-    res.json({ orders: result.rows });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch orders' });
-  }
-});
-
-app.post('/api/orders/smart', async (req, res) => {
-  try {
-    const { buyerId, items, totalAmount } = req.body;
-
-    const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [buyerId]);
-    if (buyerRes.rows.length === 0) return res.status(404).json({ message: 'Buyer not found' });
-    const buyer = buyerRes.rows[0];
-
-    let targetSellerId = buyer.parent_id;
-
-    if (!targetSellerId && buyer.role === 'shop') {
-      const distributorQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
-      if (distributorQuery.rows.length > 0) {
-        targetSellerId = distributorQuery.rows[0].id;
-      } else {
-        const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
-      }
-    }
-
-    const orderResult = await pool.query(
-      "INSERT INTO orders (buyer_id, seller_id, total_amount, status) VALUES ($1, $2, $3, $4) RETURNING id",
-      [buyerId, targetSellerId || null, totalAmount, 'Pending']
-    );
-    const orderId = orderResult.rows[0].id;
-
-    for (let item of items) {
-      await pool.query(
-        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
-        [orderId, item.productId, item.quantity, item.unitPrice]
-      );
-    }
-
-    res.status(201).json({ message: 'Order routed and placed successfully', orderId, assignedSellerId: targetSellerId });
-  } catch (err) {
-    console.error('Smart Order Error:', err);
-    res.status(500).json({ message: 'Failed to place smart order' });
-  }
-});
-
-app.put('/api/orders/:id/status', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
-    res.json({ message: 'Order status updated successfully' });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to update order status' });
-  }
-});
-
-// --- GLOBAL ERROR CATCHER ---
-app.use((err, req, res, next) => {
-  console.error('Unhandled Express Error:', err.stack);
-  res.status(500).json({ message: 'Internal server error occurred.' });
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-
 // --- UPDATE CATEGORY ---
 app.put('/api/admin/categories/:id', async (req, res) => {
   try {
@@ -494,21 +401,22 @@ app.get('/api/admin/users-list', async (req, res) => {
   }
 });
 
-// --- FETCH SPECIFIC USER'S CUSTOM PRICING OVERRIDES ---
+// --- FETCH SPECIFIC USER'S CUSTOM PRICING OVERRIDES (FIXED SELECT STATEMENT) ---
 app.get('/api/downline-pricing/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
     const result = await pool.query(`
-      p.id as product_id, p.name, p.sku, p.category, p.mrp, 
-      p.super_stockist_price, p.distributor_price, p.shop_price,
-      COALESCE(d.custom_price, 
-        CASE 
-          WHEN u.role = 'super_stockist' THEN p.super_stockist_price
-          WHEN u.role = 'distributor' THEN p.distributor_price
-          ELSE p.shop_price
-        END
-      ) as effective_price,
-      d.custom_price
+      SELECT 
+        p.id as product_id, p.name, p.sku, p.category, p.mrp, 
+        p.super_stockist_price, p.distributor_price, p.shop_price,
+        COALESCE(d.custom_price, 
+          CASE 
+            WHEN u.role = 'super_stockist' THEN p.super_stockist_price
+            WHEN u.role = 'distributor' THEN p.distributor_price
+            ELSE p.shop_price
+          END
+        ) as effective_price,
+        d.custom_price
       FROM products p
       CROSS JOIN users u
       LEFT JOIN downline_pricing_overrides d ON d.product_id = p.id AND d.user_id = $1
@@ -539,3 +447,89 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
     res.status(500).json({ message: 'Failed to update user pricing override' });
   }
 });
+
+// --- SMART ORDER ROUTING & FULFILLMENT ---
+app.get('/api/orders', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT o.id, o.total_amount, o.status, o.created_at, u.name as buyer_name, u.email as buyer_email 
+      FROM orders o
+      JOIN users u ON o.buyer_id = u.id
+      ORDER BY o.created_at DESC
+    `);
+    res.json({ orders: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+});
+
+app.post('/api/orders/smart', async (req, res) => {
+  try {
+    const { buyerId, items, totalAmount, proxyForId } = req.body;
+
+    const actualBuyerId = proxyForId || buyerId;
+    const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [actualBuyerId]);
+    if (buyerRes.rows.length === 0) return res.status(404).json({ message: 'Buyer not found' });
+    const buyer = buyerRes.rows[0];
+
+    let targetSellerId = buyer.parent_id;
+
+    // Strict Rulebook Fallback Routing if parent_id is missing
+    if (!targetSellerId) {
+      if (buyer.role === 'shop') {
+        const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
+        if (distQuery.rows.length > 0) {
+          targetSellerId = distQuery.rows[0].id;
+        } else {
+          const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
+          if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+        }
+      } else if (buyer.role === 'distributor') {
+        const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
+        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+      } else if (buyer.role === 'super_stockist') {
+        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
+        if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
+      }
+    }
+
+    const orderResult = await pool.query(
+      "INSERT INTO orders (buyer_id, seller_id, total_amount, status) VALUES ($1, $2, $3, $4) RETURNING id",
+      [actualBuyerId, targetSellerId || null, totalAmount, 'Pending']
+    );
+    const orderId = orderResult.rows[0].id;
+
+    for (let item of items) {
+      await pool.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+        [orderId, item.productId, item.quantity, item.unitPrice]
+      );
+    }
+
+    res.status(201).json({ message: 'Order routed successfully through supply chain hierarchy', orderId, assignedSellerId: targetSellerId });
+  } catch (err) {
+    console.error('Smart Order Error:', err);
+    res.status(500).json({ message: 'Failed to place smart order' });
+  }
+});
+
+app.put('/api/orders/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+    res.json({ message: 'Order status updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update order status' });
+  }
+});
+
+// --- GLOBAL ERROR CATCHER ---
+app.use((err, req, res, next) => {
+  console.error('Unhandled Express Error:', err.stack);
+  res.status(500).json({ message: 'Internal server error occurred.' });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
