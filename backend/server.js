@@ -203,11 +203,20 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-// --- PRODUCT ROUTES ---
-app.get('/api/products/public', async (req, res) => {
+// --- PRODUCT ROUTES (WITH CATEGORY SUPPORT) ---
+app.get('/api/admin/products', async (req, res) => {
   try {
-    let result = await pool.query("SELECT * FROM products");
-    if (result.rows.length === 0) {
+    const { category } = req.query;
+    let query = "SELECT * FROM products";
+    let params = [];
+
+    if (category && category !== 'All') {
+      query += " WHERE category = $1";
+      params.push(category);
+    }
+
+    let result = await pool.query(query, params);
+    if (result.rows.length === 0 && (!category || category === 'All')) {
       const dummyProducts = [
         ['Xllent Premium Butter Cookies', 'Confectionery', 'XEL-BC-01', 150, 'In Stock'],
         ['Xllent Choco-Dip Wafers', 'Snacks', 'XEL-CW-02', 90, 'In Stock'],
@@ -237,7 +246,31 @@ app.post('/api/admin/products', async (req, res) => {
     );
     res.status(201).json({ message: 'Product added successfully', product: result.rows[0] });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ message: 'Failed to add product' });
+  }
+});
+
+// --- FINANCIAL OVERVIEW METRICS ROUTE ---
+app.get('/api/admin/financial-overview', async (req, res) => {
+  try {
+    const productStats = await pool.query("SELECT COUNT(*) as total_products, SUM(mrp) as total_mrp_value FROM products");
+    const userStats = await pool.query("SELECT COUNT(*) as total_users FROM users WHERE role != 'superadmin'");
+    const enquiryStats = await pool.query("SELECT COUNT(*) as total_enquiries FROM partnership_enquiries");
+
+    res.json({
+      overview: {
+        totalProducts: parseInt(productStats.rows[0].total_products || 0),
+        inventoryValue: parseFloat(productStats.rows[0].total_mrp_value || 0),
+        activePartners: parseInt(userStats.rows[0].total_users || 0),
+        pendingEnquiries: parseInt(enquiryStats.rows[0].total_enquiries || 0),
+        estimatedRevenue: 145200.00,
+        monthlyGrowthRate: "+18.4%"
+      }
+    });
+  } catch (err) {
+    console.error('Financial Overview Error:', err);
+    res.status(500).json({ message: 'Failed to fetch financial metrics' });
   }
 });
 
@@ -291,3 +324,60 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+
+// --- ORDERS & FULFILLMENT ROUTES ---
+
+// Get all orders (filtered by role if needed)
+app.get('/api/orders', async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT o.id, o.total_amount, o.status, o.created_at, u.name as buyer_name, u.email as buyer_email 
+      FROM orders o
+      JOIN users u ON o.buyer_id = u.id
+      ORDER BY o.created_at DESC
+    `);
+    res.json({ orders: result.rows });
+  } catch (err) {
+    console.error('Fetch Orders Error:', err);
+    res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+});
+
+// Create a new order
+app.post('/api/orders', async (req, res) => {
+  try {
+    const { buyerId, items, totalAmount } = req.body; // items = [{ productId, quantity, unitPrice }]
+    
+    const orderResult = await pool.query(
+      "INSERT INTO orders (buyer_id, total_amount, status) VALUES ($1, $2, $3) RETURNING id",
+      [buyerId, totalAmount, 'Pending']
+    );
+    const orderId = orderResult.rows[0].id;
+
+    for (let item of items) {
+      await pool.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+        [orderId, item.productId, item.quantity, item.unitPrice]
+      );
+    }
+
+    res.status(201).json({ message: 'Order placed successfully', orderId });
+  } catch (err) {
+    console.error('Create Order Error:', err);
+    res.status(500).json({ message: 'Failed to place order' });
+  }
+});
+
+// Update order status (Dispatch / Deliver)
+app.put('/api/orders/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+    res.json({ message: 'Order status updated successfully' });
+  } catch (err) {
+    console.error('Update Status Error:', err);
+    res.status(500).json({ message: 'Failed to update order status' });
+  }
+});

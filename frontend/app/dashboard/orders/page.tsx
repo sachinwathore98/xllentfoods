@@ -1,28 +1,35 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, PackageCheck, Clock, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { ShoppingCart, Plus, PackageCheck, Clock, ArrowLeft } from 'lucide-react';
 
 interface Product {
-  _id: string;
+  id: number;
   name: string;
   category: string;
   mrp: number;
 }
 
+interface OrderItem {
+  product_name?: string;
+  name?: string;
+  quantity: number;
+}
+
 interface Order {
-  _id: string;
-  items: { product: Product; quantity: number }[];
-  totalAmount: number;
+  id: number;
+  items: OrderItem[];
+  total_amount: number;
   status: string;
-  createdAt: string;
+  created_at: string;
+  buyer_name?: string;
 }
 
 export default function OrdersPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState('');
-  const [quantity, setQuantity] = useState(1);
+  const [selectedProduct, setSelectedProduct] = useState<string>('');
+  const [quantity, setQuantity] = useState<number>(1);
   const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -35,10 +42,11 @@ export default function OrdersPage() {
 
   const fetchProducts = async () => {
     try {
-      const res = await API.get('/products/public');
-      setProducts(res.data.products || []);
-      if (res.data.products?.length > 0) {
-        setSelectedProduct(res.data.products[0]._id);
+      const res = await API.get('/api/products/public');
+      const fetchedProducts = res.data.products || [];
+      setProducts(fetchedProducts);
+      if (fetchedProducts.length > 0) {
+        setSelectedProduct(String(fetchedProducts[0].id));
       }
     } catch (err) {
       console.error("Error loading products", err);
@@ -48,7 +56,7 @@ export default function OrdersPage() {
   const fetchOrders = async () => {
     try {
       const token = localStorage.getItem('token');
-      const res = await API.get('/orders', {
+      const res = await API.get('/api/orders', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setOrders(res.data.orders || []);
@@ -58,12 +66,12 @@ export default function OrdersPage() {
   };
 
   const addToCart = () => {
-    const prod = products.find(p => p._id === selectedProduct);
+    const prod = products.find(p => String(p.id) === selectedProduct);
     if (!prod) return;
 
-    const existing = cart.find(item => item.product._id === prod._id);
+    const existing = cart.find(item => item.product.id === prod.id);
     if (existing) {
-      setCart(cart.map(item => item.product._id === prod._id ? { ...item, quantity: item.quantity + Number(quantity) } : item));
+      setCart(cart.map(item => item.product.id === prod.id ? { ...item, quantity: item.quantity + Number(quantity) } : item));
     } else {
       setCart([...cart, { product: prod, quantity: Number(quantity) }]);
     }
@@ -77,15 +85,26 @@ export default function OrdersPage() {
 
     try {
       const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      const user = userStr ? JSON.parse(userStr) : null;
+
+      const totalAmount = cart.reduce((sum, item) => sum + (item.product.mrp * item.quantity), 0);
+
       const orderPayload = {
-        items: cart.map(item => ({ product: item.product._id, quantity: item.quantity }))
+        buyerId: user?.id || 1,
+        totalAmount,
+        items: cart.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity,
+          unitPrice: item.product.mrp
+        }))
       };
       
-      await API.post('/orders', orderPayload, {
+      await API.post('/api/orders', orderPayload, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      setSuccess('Bulk order placed successfully!');
+      setSuccess('Bulk purchase order submitted successfully!');
       setCart([]);
       fetchOrders();
     } catch (err: any) {
@@ -122,10 +141,10 @@ export default function OrdersPage() {
                 <select
                   value={selectedProduct}
                   onChange={(e) => setSelectedProduct(e.target.value)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-black focus:outline-none focus:ring-2 focus:ring-amber-500"
                 >
                   {products.map(p => (
-                    <option key={p._id} value={p._id}>{p.name} (₹{p.mrp})</option>
+                    <option key={p.id} value={p.id}>{p.name} (₹{p.mrp})</option>
                   ))}
                 </select>
               </div>
@@ -137,13 +156,13 @@ export default function OrdersPage() {
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(Number(e.target.value))}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-black focus:outline-none focus:ring-2 focus:ring-amber-500"
                 />
               </div>
 
               <button
                 onClick={addToCart}
-                className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl shadow-md hover:bg-slate-800 transition text-xs flex items-center justify-center gap-2"
+                className="w-full py-3 bg-slate-900 text-white font-bold rounded-xl shadow-md hover:bg-slate-800 transition text-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Plus className="w-4 h-4" /> Add to Order Cart
               </button>
@@ -163,7 +182,7 @@ export default function OrdersPage() {
                 <button
                   onClick={submitOrder}
                   disabled={loading}
-                  className="w-full py-3.5 bg-amber-600 text-white font-bold rounded-xl shadow-lg hover:bg-amber-700 transition text-xs"
+                  className="w-full py-3.5 bg-amber-600 text-white font-bold rounded-xl shadow-lg hover:bg-amber-700 transition text-xs cursor-pointer disabled:opacity-50"
                 >
                   {loading ? 'Submitting...' : 'Submit Purchase Order'}
                 </button>
@@ -182,18 +201,20 @@ export default function OrdersPage() {
             ) : (
               <div className="space-y-4">
                 {orders.map((order) => (
-                  <div key={order._id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div key={order.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
-                      <span className="text-xs font-bold text-amber-600">Order ID: {order._id.slice(-6).toUpperCase()}</span>
-                      <div className="text-xs text-slate-500 mt-1">
-                        {order.items.map((i, idx) => (
-                          <span key={idx}>{i.product?.name} (x{i.quantity}){idx < order.items.length - 1 ? ', ' : ''}</span>
-                        ))}
+                      <span className="text-xs font-bold text-amber-600">Order ID: #{order.id}</span>
+                      <p className="text-xs font-semibold text-slate-700 mt-1">Placed by: {order.buyer_name || 'Partner Account'}</p>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        {new Date(order.created_at).toLocaleString()}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-extrabold text-slate-900">₹{order.totalAmount || 0}</span>
-                      <span className="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full flex items-center gap-1">
+                    <div className="flex items-center gap-4">
+                      <span className="text-xs font-extrabold text-slate-900">₹{parseFloat(String(order.total_amount || 0)).toLocaleString()}</span>
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 ${
+                        order.status === 'Delivered' ? 'bg-emerald-100 text-emerald-800' :
+                        order.status === 'Dispatched' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                      }`}>
                         <Clock className="w-3 h-3" /> {order.status || 'Pending'}
                       </span>
                     </div>
