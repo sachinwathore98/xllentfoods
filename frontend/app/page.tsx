@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, ShieldCheck, TrendingUp, Users, ArrowRight } from 'lucide-react';
+import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, ShieldCheck, TrendingUp, Users, ArrowRight, Sparkles, Zap } from 'lucide-react';
 
 const SLIDER_IMAGES = [
   '/images/slider-1.png',
@@ -21,11 +21,11 @@ export default function HomePage() {
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Auto slide effect every 4 seconds
+  // Auto slide effect every 4 seconds with smooth transition
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % SLIDER_IMAGES.length);
-    }, 4000);
+    }, 4500);
     return () => clearInterval(timer);
   }, []);
 
@@ -94,49 +94,63 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
 
-      {/* Hero Image Slider Banner */}
-      <section className="relative w-full overflow-hidden bg-slate-900 shadow-md">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:py-6">
+      {/* 1. Full-Width Edge-to-Edge Hero Slider Banner with Animated Transition */}
+      <section className="relative w-full overflow-hidden bg-slate-950 shadow-md">
+        <div className="relative w-full h-[220px] sm:h-[420px] md:h-[500px] lg:h-[560px]">
           {SLIDER_IMAGES.map((img, index) => (
             <div
               key={index}
-              className={`transition-opacity duration-700 ease-in-out ${
-                index === currentSlide ? 'opacity-100 relative block' : 'opacity-0 absolute inset-0 hidden'
+              className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
+                index === currentSlide ? 'opacity-150 z-10' : 'opacity-0 z-0 pointer-events-none'
               }`}
             >
               <img 
                 src={img} 
                 alt={`Banner ${index + 1}`} 
-                className="w-full h-[240px] sm:h-[400px] lg:h-[480px] object-cover rounded-2xl shadow-lg block mx-auto" 
+                className="w-full h-full object-cover object-center" 
               />
+              {/* Subtle dark gradient overlay for text and depth */}
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"></div>
             </div>
+          ))}
+        </div>
+        {/* Slider Indicator Dots */}
+        <div className="absolute bottom-4 left-0 right-0 z-20 flex justify-center gap-2">
+          {SLIDER_IMAGES.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => setCurrentSlide(idx)}
+              className={`h-2 rounded-full transition-all duration-300 ${
+                idx === currentSlide ? 'w-8 bg-amber-500' : 'w-2 bg-white/50'
+              }`}
+            />
           ))}
         </div>
       </section>
 
-      {/* E-Commerce Search & Filter Header Bar */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full pt-8">
-        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="w-full md:w-96">
+      {/* 2. Amazon / Flipkart Style Search & Filter Floating Bar */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full -mt-6 sm:-mt-8 relative z-30">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-xl border border-slate-200/80 flex flex-col md:flex-row justify-between items-center gap-4 backdrop-blur-md">
+          <div className="w-full md:w-[420px]">
             <div className="relative">
               <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search for products, brands and more..."
+                placeholder="Search for snacks, confectionery, namkeen & more..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-amber-500 font-medium"
+                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 focus:outline-none focus:border-amber-500 font-medium transition"
               />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
             {/* Category Dropdown */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 flex-1 sm:flex-none">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 flex-1 sm:flex-none">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-amber-600" />
               <select
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
@@ -150,8 +164,8 @@ export default function HomePage() {
             </div>
 
             {/* Sorting Dropdown */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 flex-1 sm:flex-none">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2.5 flex-1 sm:flex-none">
+              <ArrowUpDown className="w-3.5 h-3.5 text-amber-600" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
@@ -167,19 +181,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Main E-Commerce Catalog Grid & Cart Section */}
+      {/* 3. Main E-Commerce Catalog Grid & Animated Cards */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Featured FMCG Products</h2>
-          <span className="text-xs font-bold text-slate-500">{filteredProducts.length} items available</span>
+          <div className="flex items-center gap-2">
+            <span className="p-2 bg-amber-500/10 text-amber-600 rounded-xl"><Zap className="w-4 h-4" /></span>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Featured FMCG Products</h2>
+          </div>
+          <span className="text-xs font-bold text-slate-500 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-sm">
+            {filteredProducts.length} Items Live
+          </span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* Products Grid (Spans 3 cols on desktop, 2 cols on mobile) */}
+          {/* Products Grid (2 cols on mobile, 3 cols on laptop) */}
           <div className="lg:col-span-3">
             {loading ? (
-              <div className="text-center py-20 text-slate-400 text-xs font-semibold">Loading store inventory...</div>
+              <div className="text-center py-20 text-slate-400 text-xs font-semibold animate-pulse">Loading store inventory...</div>
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-2xl border border-slate-200 text-slate-400 text-xs font-semibold shadow-sm">
                 No products found matching your search.
@@ -187,26 +206,29 @@ export default function HomePage() {
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                 {filteredProducts.map((product) => (
-                  <div key={product.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between group">
+                  <div 
+                    key={product.id} 
+                    className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between group"
+                  >
                     <div>
                       <div className="h-36 sm:h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                         {product.image ? (
-                          <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+                          <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                         ) : (
                           <Package className="w-10 h-10 text-slate-300" />
                         )}
-                        <span className="absolute top-2 left-2 bg-white/90 backdrop-blur-md text-slate-800 text-[9px] font-bold px-2 py-0.5 rounded-md uppercase shadow-sm">
+                        <span className="absolute top-2 left-2 bg-white/90 backdrop-blur-md text-slate-800 text-[9px] font-extrabold px-2 py-0.5 rounded-md uppercase shadow-sm border border-slate-100">
                           {product.category || 'FMCG'}
                         </span>
                       </div>
                       <div className="p-3 sm:p-4">
-                        <h3 className="font-extrabold text-slate-900 text-xs sm:text-sm truncate">{product.name}</h3>
+                        <h3 className="font-extrabold text-slate-900 text-xs sm:text-sm truncate group-hover:text-amber-600 transition">{product.name}</h3>
                         <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {product.sku || 'N/A'}</p>
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2">{product.description || 'Premium quality FMCG product.'}</p>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 font-light">{product.description || 'Premium quality FMCG product.'}</p>
                         
-                        <div className="mt-2 text-[9px] text-slate-600 bg-amber-50 p-1.5 rounded-lg border border-amber-100 flex justify-between font-semibold">
-                          <span>📦 Pkt: {product.pieces_per_packet || 1} Pcs</span>
-                          <span>📦 Ctn: {product.packets_per_carton || 1} Pkts</span>
+                        <div className="mt-2.5 text-[9px] text-slate-600 bg-amber-50 p-2 rounded-xl border border-amber-100 flex justify-between font-semibold">
+                          <span className="text-amber-700">📦 Pkt: {product.pieces_per_packet || 1} Pcs</span>
+                          <span className="text-blue-700">📦 Ctn: {product.packets_per_carton || 1} Pkts</span>
                         </div>
                       </div>
                     </div>
@@ -217,7 +239,7 @@ export default function HomePage() {
                       </div>
                       <button
                         onClick={() => addToCart(product)}
-                        className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[11px] sm:text-xs transition flex items-center gap-1 cursor-pointer shadow-sm"
+                        className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[11px] sm:text-xs transition-all duration-200 flex items-center gap-1 cursor-pointer shadow-md hover:scale-105 active:scale-95"
                       >
                         <Plus className="w-3.5 h-3.5" /> Add
                       </button>
@@ -228,9 +250,9 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Sidebar Quick Cart (Amazon / Flipkart Style Sidebar) */}
+          {/* Sidebar Quick Cart (Amazon / Flipkart Style Sticky Sidebar) */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm sticky top-24">
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm sticky top-24">
               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
                 <ShoppingCart className="w-5 h-5 text-amber-600" />
                 <h3 className="font-black text-slate-900 text-sm">Shopping Cart ({cart.reduce((acc, item) => acc + item.quantity, 0)})</h3>
@@ -253,7 +275,7 @@ export default function HomePage() {
                     <span>Subtotal:</span>
                     <span className="text-amber-600">₹{cart.reduce((acc, item) => acc + (item.quantity * item.mrp), 0)}</span>
                   </div>
-                  <a href="/login" className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider block text-center shadow-md transition">
+                  <a href="/login" className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs uppercase tracking-wider block text-center shadow-lg transition hover:scale-[1.02]">
                     Proceed to Checkout
                   </a>
                 </div>
@@ -266,17 +288,17 @@ export default function HomePage() {
 
       {/* Partnership Callout Banner */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full pb-16">
-        <div className="bg-gradient-to-r from-slate-900 to-slate-800 p-8 sm:p-12 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-center justify-between gap-6">
+        <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-8 sm:p-12 rounded-3xl text-white shadow-2xl flex flex-col md:flex-row items-center justify-between gap-6 border border-slate-800">
           <div>
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-              B2B Growth Opportunity
+            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20 flex items-center gap-1.5 w-fit mb-3">
+              <Sparkles className="w-3.5 h-3.5" /> B2B Growth Opportunity
             </span>
-            <h3 className="text-2xl sm:text-3xl font-black mt-3 tracking-tight">Become a Super Stockist or Distributor</h3>
-            <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-xl">
+            <h3 className="text-2xl sm:text-3xl font-black tracking-tight">Become a Super Stockist or Distributor</h3>
+            <p className="text-xs sm:text-sm text-slate-300 mt-2 max-w-xl font-light">
               Scale your business with high profit margins, protected regional territories, and complete digital downline management.
             </p>
           </div>
-          <a href="/partnership" className="px-6 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs uppercase tracking-wider transition shadow-lg shrink-0 flex items-center gap-2">
+          <a href="/partnership" className="px-6 py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs uppercase tracking-wider transition-all duration-300 shadow-xl shrink-0 flex items-center gap-2 hover:scale-105">
             <span>Apply For Partnership</span>
             <ArrowRight className="w-4 h-4" />
           </a>
