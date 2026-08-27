@@ -760,3 +760,36 @@ app.get('/api/admin/downline-users', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch downline users' });
   }
 });
+
+// --- SCOPED HIERARCHY ORDERS ROUTE ---
+app.get('/api/orders', async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    let query = `
+      SELECT o.id, o.total_amount, o.status, o.created_at, 
+             b.id as buyer_id, b.name as buyer_name, b.email as buyer_email, b.role as buyer_role,
+             s.id as seller_id, s.name as seller_name, s.role as seller_role
+      FROM orders o
+      JOIN users b ON o.buyer_id = b.id
+      LEFT JOIN users s ON o.seller_id = s.id
+    `;
+
+    let params = [];
+    
+    // Admins and Superadmins see all network orders
+    if (role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
+      // Other roles see orders where they are either the buyer, the seller, or part of their downstream network
+      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1 OR b.parent_id = $1`;
+      params.push(userId);
+    }
+
+    query += ` ORDER BY o.created_at DESC`;
+
+    const result = await pool.query(query, params);
+    res.json({ orders: result.rows });
+  } catch (err) {
+    console.error('Failed to fetch orders:', err);
+    res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+});

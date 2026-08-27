@@ -1,337 +1,205 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Package, CheckCircle2, ArrowUpRight, UserCheck, Truck } from 'lucide-react';
+import { ShoppingCart, CheckCircle, XCircle, FileText, Truck, Edit3, User, Building, ArrowRight, Printer, X } from 'lucide-react';
 
-interface Product {
-  id: number;
-  name: string;
-  sku: string;
-  mrp: number;
-  shop_price: number;
-  distributor_price: number;
-  super_stockist_price: number;
-  pieces_per_packet: number;
-  packets_per_carton: number;
-}
-
-interface Order {
-  id: number;
-  total_amount: number;
-  status: string;
-  created_at: string;
-  buyer_name: string;
-  buyer_email: string;
-  buyer_role: string;
-  seller_id: number;
-}
-
-interface ShopUser {
-  id: number;
-  name: string;
-  email: string;
-}
-
-export default function OrdersPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [shops, setShops] = useState<ShopUser[]>([]);
-  const [selectedShopId, setSelectedShopId] = useState<string>('');
-  
-  const [cart, setCart] = useState<{ product: Product; quantity: number; unitType: string }[]>([]);
-  const [userRole, setUserRole] = useState<string>('');
-  const [userId, setUserId] = useState<number | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
+export default function SmartOrdersPage() {
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [selectedOrderForInvoice, setSelectedOrderForInvoice] = useState<any>(null);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
     if (userStr) {
-      const user = JSON.parse(userStr);
-      setUserRole(user.role);
-      setUserId(user.id);
-      fetchOrders(user.id, user.role);
-      if (user.role === 'employee') {
-        fetchShopsList();
-      }
+      const u = JSON.parse(userStr);
+      setCurrentUser(u);
+      fetchOrders(u.id, u.role);
     }
-    fetchProducts();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchOrders = async (userId: number, role: string) => {
     try {
-      const res = await API.get('/api/products/public');
-      setProducts(res.data.products || []);
-    } catch (err) {
-      console.error('Failed to load products', err);
-    }
-  };
-
-  const fetchOrders = async (currentUserId: number, currentRole: string) => {
-    try {
-      const res = await API.get(`/api/orders?userId=${currentUserId}&role=${currentRole}`);
+      setLoading(true);
+      const res = await API.get(`/api/orders?userId=${userId}&role=${role}`);
       setOrders(res.data.orders || []);
     } catch (err) {
-      console.error('Failed to load scoped orders', err);
-    }
-  };
-
-  const fetchShopsList = async () => {
-    try {
-      const res = await API.get('/api/admin/users-list');
-      const shopList = (res.data.users || []).filter((u: any) => u.role === 'shop');
-      setShops(shopList);
-      if (shopList.length > 0) setSelectedShopId(shopList[0].id.toString());
-    } catch (err) {
-      console.error('Failed to load shops', err);
-    }
-  };
-
-  const getEffectivePrice = (product: Product) => {
-    if (userRole === 'super_stockist') return product.super_stockist_price || product.mrp;
-    if (userRole === 'distributor') return product.distributor_price || product.mrp;
-    return product.shop_price || product.mrp;
-  };
-
-  const isCartonOrdering = ['super_stockist', 'distributor'].includes(userRole);
-  const unitLabel = isCartonOrdering ? 'Cartons' : 'Packets';
-
-  const addToCart = (product: Product) => {
-    const existing = cart.find(item => item.product.id === product.id);
-    if (existing) {
-      setCart(cart.map(item => item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item));
-    } else {
-      setCart([...cart, { product, quantity: 1, unitType: unitLabel }]);
-    }
-  };
-
-  const handleQuantityChange = (productId: number, qty: number) => {
-    if (qty <= 0) {
-      setCart(cart.filter(item => item.product.id !== productId));
-    } else {
-      setCart(cart.map(item => item.product.id === productId ? { ...item, quantity: qty } : item));
-    }
-  };
-
-  const handlePlaceOrder = async () => {
-    if (cart.length === 0 || !userId) return;
-    setLoading(true);
-    setMessage('');
-
-    try {
-      const itemsPayload = cart.map(item => {
-        const p = item.product;
-        const multiplier = isCartonOrdering 
-          ? (p.packets_per_carton || 1) * (p.pieces_per_packet || 1) 
-          : (p.pieces_per_packet || 1);
-        
-        return {
-          productId: p.id,
-          quantity: item.quantity * multiplier,
-          unitPrice: getEffectivePrice(p)
-        };
-      });
-
-      const totalAmount = itemsPayload.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-
-      const payload: any = {
-        buyerId: userId,
-        totalAmount,
-        items: itemsPayload
-      };
-
-      if (userRole === 'employee' && selectedShopId) {
-        payload.proxyForId = Number(selectedShopId);
-      }
-
-      const res = await API.post('/api/orders/smart', payload);
-      setMessage(`Order successfully placed and routed upstream! (Order ID: #${res.data.orderId})`);
-      setCart([]);
-      if (userId && userRole) fetchOrders(userId, userRole);
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Failed to place order.');
+      console.error('Error fetching orders', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (orderId: number, newStatus: string) => {
+  const updateOrderStatus = async (orderId: number, status: string) => {
     try {
-      await API.put(`/api/orders/${orderId}/status`, { status: newStatus });
-      setMessage(`Order #${orderId} fulfilled and status updated to ${newStatus}`);
-      if (userId && userRole) fetchOrders(userId, userRole);
-      setTimeout(() => setMessage(''), 3000);
+      await API.put(`/api/orders/${orderId}/status`, { status });
+      setSuccessMsg(`Order #${orderId} marked as ${status}`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+      if (currentUser) fetchOrders(currentUser.id, currentUser.role);
     } catch (err) {
-      alert('Failed to update status.');
+      setErrorMsg('Failed to update order status');
+      setTimeout(() => setErrorMsg(''), 3000);
     }
   };
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto text-slate-800 bg-slate-50 min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div className="p-6 sm:p-10 max-w-7xl mx-auto">
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <ShoppingCart className="w-8 h-8 text-amber-600" /> Smart Supply Chain & Local Fulfillment
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Portal Role: <span className="font-bold uppercase text-amber-600">{userRole}</span>. Fulfill downline orders from local stock or place orders upward.
+          <span className="text-xs font-bold text-amber-600 uppercase tracking-widest bg-amber-50 px-3 py-1 rounded-full border border-amber-100">
+            Smart Supply Chain & Fulfillment
+          </span>
+          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 mt-2">Orders & Downstream Feed</h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-1">
+            Portal Role: <b className="text-slate-900 uppercase">{currentUser?.role || 'USER'}</b>. Fulfill downline orders or track upstream requests.
           </p>
         </div>
       </div>
 
-      {message && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 shrink-0" />
-          <span>{message}</span>
+      {successMsg && (
+        <div className="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs font-bold shadow-sm">
+          {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div className="mb-6 p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl text-xs font-bold shadow-sm">
+          {errorMsg}
         </div>
       )}
 
-      {/* Employee Proxy Banner */}
-      {userRole === 'employee' && (
-        <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <UserCheck className="w-6 h-6 text-amber-600" />
-            <div>
-              <h4 className="font-bold text-xs text-amber-900 uppercase">Field Employee Proxy Mode</h4>
-              <p className="text-[11px] text-amber-700">Select a retail shop below to place packet orders on their behalf.</p>
+      {loading ? (
+        <div className="text-center py-20 text-slate-400 text-xs font-semibold animate-pulse">Loading network orders feed...</div>
+      ) : orders.length === 0 ? (
+        <div className="bg-white rounded-3xl border border-slate-200 p-12 text-center shadow-sm">
+          <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-sm font-bold text-slate-700">No orders found for your account scope.</p>
+          <p className="text-xs text-slate-400 mt-1">Orders placed by your downline or network vendors will appear here automatically.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {orders.map((ord) => (
+            <div key={ord.id} className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm hover:shadow-md transition flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+              
+              {/* Order Info */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-black bg-slate-900 text-white px-3 py-1 rounded-xl">
+                    Order #{ord.id}
+                  </span>
+                  <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full uppercase ${
+                    ord.status === 'Approved' ? 'bg-emerald-100 text-emerald-800' :
+                    ord.status === 'Dispatched' ? 'bg-blue-100 text-blue-800' :
+                    ord.status === 'Denied' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {ord.status || 'Pending'}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">
+                    {new Date(ord.created_at).toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 text-xs text-slate-600 pt-2">
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                    <User className="w-3.5 h-3.5 text-amber-600" />
+                    <span><b>Buyer:</b> {ord.buyer_name} ({ord.buyer_role?.toUpperCase()})</span>
+                  </div>
+                  <ArrowRight className="w-3.5 h-3.5 text-slate-400" />
+                  <div className="flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100">
+                    <Building className="w-3.5 h-3.5 text-blue-600" />
+                    <span><b>Assigned Seller:</b> {ord.seller_name || 'Direct Admin Fulfillment'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total & Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between lg:justify-end gap-4 w-full lg:w-auto border-t lg:border-t-0 border-slate-100 pt-4 lg:pt-0">
+                <div className="text-left lg:text-right">
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">Total Amount</span>
+                  <span className="text-lg font-black text-slate-900">₹{ord.total_amount}</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateOrderStatus(ord.id, 'Approved')}
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1 shadow-sm"
+                  >
+                    <CheckCircle className="w-3.5 h-3.5" /> Approve
+                  </button>
+                  <button
+                    onClick={() => updateOrderStatus(ord.id, 'Dispatched')}
+                    className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1 shadow-sm"
+                  >
+                    <Truck className="w-3.5 h-3.5" /> Dispatch
+                  </button>
+                  <button
+                    onClick={() => updateOrderStatus(ord.id, 'Denied')}
+                    className="px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1 shadow-sm"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> Deny
+                  </button>
+                  <button
+                    onClick={() => setSelectedOrderForInvoice(ord)}
+                    className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition flex items-center gap-1 shadow-sm"
+                  >
+                    <FileText className="w-3.5 h-3.5" /> Invoice
+                  </button>
+                </div>
+              </div>
+
             </div>
-          </div>
-          <select
-            value={selectedShopId}
-            onChange={(e) => setSelectedShopId(e.target.value)}
-            className="px-4 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-slate-900 outline-none"
-          >
-            {shops.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.email})</option>
-            ))}
-          </select>
+          ))}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Product Catalog & Ordering Section (Hidden for Admin/Superadmin unless stocking) */}
-        {['super_stockist', 'distributor', 'shop', 'employee'].includes(userRole) && (
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-                <Package className="w-5 h-5 text-amber-600" /> Stock Replenishment / Upstream Order ({unitLabel})
-              </h3>
+      {/* Invoice Modal */}
+      {selectedOrderForInvoice && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-8 max-w-2xl w-full shadow-2xl border border-slate-200 relative">
+            <button 
+              onClick={() => setSelectedOrderForInvoice(null)} 
+              className="absolute top-6 right-6 p-2 bg-slate-100 hover:bg-slate-200 rounded-full text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-2">
-                {products.map(p => (
-                  <div key={p.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex justify-between items-center">
-                    <div>
-                      <h4 className="font-bold text-xs text-slate-900">{p.name}</h4>
-                      <p className="text-[10px] text-slate-400">SKU: {p.sku}</p>
-                      <p className="text-xs font-black text-amber-600 mt-1">₹{getEffectivePrice(p)} / unit</p>
-                    </div>
-                    <button
-                      onClick={() => addToCart(p)}
-                      className="px-3 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-amber-600 transition cursor-pointer"
-                    >
-                      Add
-                    </button>
-                  </div>
-                ))}
+            <div className="text-center border-b border-slate-100 pb-6 mb-6">
+              <h2 className="text-2xl font-black text-slate-900">XLLENT FOODS</h2>
+              <p className="text-xs text-slate-500 uppercase tracking-widest mt-1">Official B2B Supply Chain Tax Invoice</p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 text-xs mb-6 bg-slate-50 p-4 rounded-2xl">
+              <div>
+                <p className="text-slate-400 font-bold uppercase">Invoice Details:</p>
+                <p className="font-bold text-slate-900 mt-1">Invoice #INV-2026-{selectedOrderForInvoice.id}</p>
+                <p className="text-slate-600">Date: {new Date(selectedOrderForInvoice.created_at).toLocaleDateString()}</p>
+                <p className="text-slate-600">Status: <b className="text-amber-600">{selectedOrderForInvoice.status}</b></p>
+              </div>
+              <div>
+                <p className="text-slate-400 font-bold uppercase">Buyer Information:</p>
+                <p className="font-bold text-slate-900 mt-1">{selectedOrderForInvoice.buyer_name}</p>
+                <p className="text-slate-600">Email: {selectedOrderForInvoice.buyer_email}</p>
+                <p className="text-slate-600">Role: {selectedOrderForInvoice.buyer_role?.toUpperCase()}</p>
               </div>
             </div>
+
+            <div className="border-t border-b border-slate-200 py-4 mb-6 flex justify-between items-center text-sm font-black">
+              <span>Total Payable Amount:</span>
+              <span className="text-amber-600 text-lg">₹{selectedOrderForInvoice.total_amount}</span>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => window.print()}
+                className="px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-2 shadow-md cursor-pointer"
+              >
+                <Printer className="w-4 h-4" /> Print / Download PDF Invoice
+              </button>
+            </div>
           </div>
-        )}
-
-        {/* Cart Sidebar */}
-        {['super_stockist', 'distributor', 'shop', 'employee'].includes(userRole) && (
-          <div className="lg:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm h-fit space-y-4">
-            <h3 className="font-bold text-base text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-3">
-              <ShoppingCart className="w-5 h-5 text-amber-600" /> Order Cart ({cart.length})
-            </h3>
-
-            {cart.length === 0 ? (
-              <p className="text-xs text-slate-400 text-center py-8">Cart is empty.</p>
-            ) : (
-              <div className="space-y-3">
-                {cart.map((item, idx) => (
-                  <div key={idx} className="flex flex-col gap-2 text-xs bg-slate-50 p-3 rounded-xl border border-slate-100">
-                    <div className="flex justify-between items-center">
-                      <p className="font-bold text-slate-800">{item.product.name}</p>
-                      <span className="font-extrabold text-amber-600">₹{(item.quantity * getEffectivePrice(item.product)).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[11px] text-slate-500">
-                      <span>Qty ({item.unitType}):</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.quantity}
-                        onChange={(e) => handleQuantityChange(item.product.id, Number(e.target.value))}
-                        className="w-16 px-2 py-1 bg-white border border-slate-300 rounded-lg text-center font-bold text-slate-900"
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center text-sm font-black text-slate-900">
-                  <span>Total Amount:</span>
-                  <span>₹{cart.reduce((sum, item) => sum + (item.quantity * getEffectivePrice(item.product)), 0).toLocaleString()}</span>
-                </div>
-
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={loading}
-                  className="w-full py-3 bg-amber-600 text-white font-bold rounded-xl text-xs hover:bg-amber-700 transition flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-amber-600/20"
-                >
-                  {loading ? 'Routing...' : 'Place Upstream Order'} <ArrowUpRight className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-      </div>
-
-      {/* Scoped Inbound / Outbound Orders Feed */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-        <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-          <Truck className="w-5 h-5 text-amber-600" /> Downline & Upstream Orders Feed
-        </h3>
-        {orders.length === 0 ? (
-          <p className="text-xs text-slate-400 py-6 text-center">No orders found for your account scope.</p>
-        ) : (
-          <div className="space-y-4">
-            {orders.map(ord => (
-              <div key={ord.id} className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-slate-900">Order ID: #{ord.id}</span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${ord.status === 'Pending' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                      {ord.status}
-                    </span>
-                    <span className="text-[10px] bg-slate-200 text-slate-700 px-2 py-0.5 rounded font-bold uppercase">
-                      Buyer: {ord.buyer_name} ({ord.buyer_role})
-                    </span>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Placed on {new Date(ord.created_at).toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <span className="text-base font-black text-slate-900">₹{Number(ord.total_amount).toLocaleString()}</span>
-                  
-                  {/* Fulfillment button: Allows Super Stockists, Distributors, and Admins to fulfill/approve inbound orders from their direct downlines */}
-                  {ord.status === 'Pending' && (
-                    <button
-                      onClick={() => handleUpdateStatus(ord.id, 'Fulfilled & Dispatched')}
-                      className="px-3 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition cursor-pointer shadow-md"
-                    >
-                      Fulfill & Dispatch Stock
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
