@@ -793,3 +793,15 @@ app.get('/api/orders', async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch orders' });
   }
 });
+// --- DELETE USER ROUTE ---
+app.delete('/api/admin/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM users WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+    res.json({ message: 'User account deleted successfully' });
+  } catch (err) {
+    console.error('Delete User Error:', err);
+    res.status(500).json({ message: 'Failed to delete user account' });
+  }
+});
