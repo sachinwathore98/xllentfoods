@@ -38,11 +38,14 @@ export default function CreateUserPage() {
   };
 
   // Dynamic Filtering based on selected role tier:
+  // - Admin -> Parent must be Superadmin
   // - Super Stockist -> Parent must be Admin (admin, superadmin)
   // - Distributor -> Parent must be Super Stockist (super_stockist)
   // - Retail Shop / Field Employee -> Parent must be Super Stockist or Distributor
-  // - Admin -> No parent required
   const getFilteredParents = () => {
+    if (role === 'admin') {
+      return parentsList.filter(p => p.role === 'superadmin');
+    }
     if (role === 'super_stockist') {
       return parentsList.filter(p => p.role === 'admin' || p.role === 'superadmin');
     }
@@ -57,7 +60,7 @@ export default function CreateUserPage() {
 
   const handleRoleChange = (newRole: string) => {
     setRole(newRole);
-    setParentId(''); // Reset parent selection when role changes to avoid invalid uplink mapping
+    setParentId(''); // Reset parent selection when role changes
   };
 
   const handleGetLocation = () => {
@@ -180,11 +183,11 @@ export default function CreateUserPage() {
                 onChange={(e) => handleRoleChange(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               >
+                <option value="admin">Admin</option>
                 <option value="super_stockist">Super Stockist</option>
                 <option value="distributor">Distributor</option>
                 <option value="shop">Retail Shop</option>
                 <option value="employee">Field Employee</option>
-                <option value="admin">Admin</option>
               </select>
             </div>
           </div>
@@ -204,12 +207,12 @@ export default function CreateUserPage() {
             {/* Parent Account Mapping with Dynamic Filtering */}
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Assign Parent Uplink {role === 'admin' ? '(Not Required)' : `(Required for ${role.replace('_', ' ')})`}
+                Assign Parent Uplink (Required for {role.replace('_', ' ')})
               </label>
               <select
                 value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
-                required={role !== 'admin'}
+                required
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >
                 <option value="">-- Select Authorized Parent Uplink --</option>
@@ -218,10 +221,10 @@ export default function CreateUserPage() {
                 ))}
               </select>
               <p className="text-[10px] text-slate-400 mt-1">
+                {role === 'admin' && 'Admins must report directly to Superadmin accounts.'}
                 {role === 'super_stockist' && 'Super Stockists must report directly to Admin accounts.'}
                 {role === 'distributor' && 'Distributors must report directly to Super Stockist accounts.'}
                 {(role === 'shop' || role === 'employee') && 'Retail Shops and Field Employees report to Super Stockists or Distributors.'}
-                {role === 'admin' && 'Admins operate independently at the apex level.'}
               </p>
             </div>
           </div>
