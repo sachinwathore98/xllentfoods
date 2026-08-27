@@ -276,6 +276,7 @@ app.get('/api/categories', async (req, res) => {
     const result = await pool.query("SELECT * FROM categories ORDER BY name ASC");
     res.json({ categories: result.rows });
   } catch (err) {
+    console.error('Fetch Categories Error:', err);
     res.status(500).json({ message: 'Failed to fetch categories' });
   }
 });
@@ -304,15 +305,17 @@ app.get('/api/admin/products', async (req, res) => {
     let result = await pool.query(query, params);
     res.json({ products: result.rows });
   } catch (err) {
+    console.error('Server error loading products:', err);
     res.status(500).json({ message: 'Server error loading products' });
   }
 });
 
 app.get('/api/products/public', async (req, res) => {
   try {
-    let result = await pool.query("SELECT * FROM products");
+    const result = await pool.query("SELECT * FROM products");
     res.json({ products: result.rows });
   } catch (err) {
+    console.error('Fetch Public Products Error:', err);
     res.status(500).json({ message: 'Server error loading products' });
   }
 });
@@ -677,24 +680,3 @@ app.use((err, req, res, next) => {
 // --- SERVER LISTENER ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-
-// --- PUBLIC CATEGORIES & PRODUCTS ENDPOINTS ---
-app.get('/api/categories', async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM categories ORDER BY name ASC");
-    res.json({ categories: result.rows });
-  } catch (err) {
-    console.error('Fetch Categories Error:', err);
-    res.status(500).json({ message: 'Failed to fetch categories' });
-  }
-});
-
-app.get('/api/products/public', async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM products");
-    res.json({ products: result.rows });
-  } catch (err) {
-    console.error('Fetch Public Products Error:', err);
-    res.status(500).json({ message: 'Server error loading products' });
-  }
-});
