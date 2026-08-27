@@ -3,34 +3,42 @@ import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { Package, Search, ShoppingCart, Plus, Check } from 'lucide-react';
+import { Package, Search, ShoppingCart, Plus, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
+  const [sortBy, setSortBy] = useState('default');
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchCategories();
-    fetchProducts('All');
+    fetchInitialData();
   }, []);
 
-  const fetchCategories = async () => {
+  const fetchInitialData = async () => {
     try {
-      const res = await API.get('/categories');
-      setCategories(res.data.categories || []);
+      setLoading(true);
+      const [catRes, prodRes] = await Promise.all([
+        API.get('/categories').catch(() => ({ data: { categories: [] } })),
+        API.get('/admin/products').catch(() => ({ data: { products: [] } }))
+      ]);
+
+      setCategories(catRes.data.categories || []);
+      setProducts(prodRes.data.products || []);
     } catch (err) {
-      console.error('Error fetching categories', err);
+      console.error('Error loading products and categories', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const fetchProducts = async (categoryName: string) => {
+  const handleCategoryChange = async (categoryName: string) => {
+    setSelectedCategory(categoryName);
     try {
       setLoading(true);
-      setSelectedCategory(categoryName);
       const endpoint = categoryName === 'All' 
         ? '/admin/products' 
         : `/admin/products?category=${encodeURIComponent(categoryName)}`;
@@ -38,7 +46,7 @@ export default function ProductsPage() {
       const res = await API.get(endpoint);
       setProducts(res.data.products || []);
     } catch (err) {
-      console.error('Error fetching products', err);
+      console.error('Error filtering products by category', err);
     } finally {
       setLoading(false);
     }
@@ -54,17 +62,28 @@ export default function ProductsPage() {
     });
   };
 
-  const filteredProducts = products.filter((p) => 
+  // Filter products by search term
+  let filteredProducts = products.filter((p) => 
     p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
+    p.sku?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.category?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Apply Sorting Options
+  if (sortBy === 'low-high') {
+    filteredProducts.sort((a, b) => Number(a.mrp) - Number(b.mrp));
+  } else if (sortBy === 'high-low') {
+    filteredProducts.sort((a, b) => Number(b.mrp) - Number(a.mrp));
+  } else if (sortBy === 'name-az') {
+    filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between">
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-6 py-12 w-full">
-        {/* Catalog Header */}
+        {/* Catalog Banner */}
         <div className="bg-slate-900 text-white p-8 sm:p-12 rounded-3xl mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl">
           <div>
             <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
@@ -89,41 +108,78 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* Category Filter Bar */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-4 mb-10 scrollbar-none">
-          <button
-            onClick={() => fetchProducts('All')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-sm ${
-              selectedCategory === 'All' 
-                ? 'bg-amber-600 text-white shadow-amber-600/20' 
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-            }`}
-          >
-            All
-          </button>
-          {categories.map((cat) => (
+        {/* Filter Controls Bar (Category Buttons + Select Dropdown + Sort Options) */}
+        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 mb-10 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+          
+          {/* Category Horizontal Pills */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
             <button
-              key={cat.id}
-              onClick={() => fetchProducts(cat.name)}
-              className={`px-5 py-2.5 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer shadow-sm ${
-                selectedCategory === cat.name 
-                  ? 'bg-amber-600 text-white shadow-amber-600/20' 
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
+              onClick={() => handleCategoryChange('All')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                selectedCategory === 'All' 
+                  ? 'bg-amber-600 text-white shadow-md' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              {cat.name}
+              All Categories
             </button>
-          ))}
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => handleCategoryChange(cat.name)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition shrink-0 cursor-pointer ${
+                  selectedCategory === cat.name 
+                    ? 'bg-amber-600 text-white shadow-md' 
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Right Controls: Category Dropdown & Sorting */}
+          <div className="flex items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+            {/* Category Select Dropdown */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+              <select
+                value={selectedCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="All">Select Category (All)</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.name}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Sort Options Dropdown */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="default">Sort By: Featured</option>
+                <option value="low-high">Price: Low to High</option>
+                <option value="high-low">Price: High to Low</option>
+                <option value="name-az">Name: A to Z</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Products Grid & Cart Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             {loading ? (
-              <div className="text-center py-20 text-slate-400 text-xs font-semibold">Loading catalog items...</div>
+              <div className="text-center py-20 text-slate-400 text-xs font-semibold">Loading live inventory...</div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-semibold">
-                No products found matching your search.
+              <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-semibold shadow-sm">
+                No products found matching your criteria.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
