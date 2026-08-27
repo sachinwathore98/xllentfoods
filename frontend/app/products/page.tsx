@@ -22,8 +22,8 @@ export default function ProductsPage() {
     try {
       setLoading(true);
       const [catRes, prodRes] = await Promise.all([
-        API.get('/categories').catch(() => ({ data: { categories: [] } })),
-        API.get('/admin/products').catch(() => ({ data: { products: [] } }))
+        API.get('/api/categories').catch(() => ({ data: { categories: [] } })),
+        API.get('/api/products/public').catch(() => ({ data: { products: [] } }))
       ]);
 
       setCategories(catRes.data.categories || []);
@@ -39,12 +39,13 @@ export default function ProductsPage() {
     setSelectedCategory(categoryName);
     try {
       setLoading(true);
-      const endpoint = categoryName === 'All' 
-        ? '/admin/products' 
-        : `/admin/products?category=${encodeURIComponent(categoryName)}`;
+      const res = await API.get('/api/products/public');
+      let allProds = res.data.products || [];
       
-      const res = await API.get(endpoint);
-      setProducts(res.data.products || []);
+      if (categoryName !== 'All') {
+        allProds = allProds.filter((p: any) => p.category?.toLowerCase() === categoryName.toLowerCase());
+      }
+      setProducts(allProds);
     } catch (err) {
       console.error('Error filtering products by category', err);
     } finally {
@@ -79,14 +80,14 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
 
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full">
         {/* Catalog Banner */}
         <div className="bg-slate-900 text-white p-6 sm:p-12 rounded-3xl mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl">
           <div>
-            <span className="text-[10px] sm:text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+            <span className="text-[10px] sm:text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/25">
               Wholesale & Retail Portal
             </span>
             <h1 className="text-2xl sm:text-4xl font-black mt-3 tracking-tight">Xllent Foods Catalog</h1>
@@ -108,7 +109,7 @@ export default function ProductsPage() {
           </div>
         </div>
 
-        {/* Filter Controls Bar (Category Buttons + Select Dropdown + Sort Options) */}
+        {/* Filter Controls Bar */}
         <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 mb-8 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
           
           {/* Category Horizontal Pills */}
@@ -140,7 +141,6 @@ export default function ProductsPage() {
 
           {/* Right Controls: Category Dropdown & Sorting */}
           <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
-            {/* Category Select Dropdown */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-none">
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <select
@@ -155,7 +155,6 @@ export default function ProductsPage() {
               </select>
             </div>
 
-            {/* Sort Options Dropdown */}
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-none">
               <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <select
@@ -175,16 +174,14 @@ export default function ProductsPage() {
         {/* Products Grid & Cart Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
-          {/* Products Column */}
           <div className="lg:col-span-2">
             {loading ? (
-              <div className="text-center py-20 text-slate-400 text-xs font-semibold">Loading live inventory...</div>
+              <div className="text-center py-20 text-slate-400 text-xs font-semibold animate-pulse">Loading live inventory...</div>
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-20 bg-white rounded-3xl border border-slate-200 text-slate-400 text-xs font-semibold shadow-sm">
                 No products found matching your criteria.
               </div>
             ) : (
-              /* MOBILE & LAPTOP GRID VIEW: grid-cols-2 ensures 2 items per row on phones, sm:grid-cols-2 md:grid-cols-3 */
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
                 {filteredProducts.map((product) => (
                   <div key={product.id} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
@@ -195,7 +192,7 @@ export default function ProductsPage() {
                         ) : (
                           <Package className="w-10 h-10 text-slate-300" />
                         )}
-                        <span className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-white/90 backdrop-blur-md text-slate-800 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase">
+                        <span className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-white/95 backdrop-blur-md text-slate-800 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase shadow-sm">
                           {product.category || 'FMCG'}
                         </span>
                       </div>
