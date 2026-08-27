@@ -37,6 +37,29 @@ export default function CreateUserPage() {
     }
   };
 
+  // Dynamic Filtering based on selected role tier:
+  // - Super Stockist -> Parent must be Admin (admin, superadmin)
+  // - Distributor -> Parent must be Super Stockist (super_stockist)
+  // - Retail Shop / Field Employee -> Parent must be Super Stockist or Distributor
+  // - Admin -> No parent required
+  const getFilteredParents = () => {
+    if (role === 'super_stockist') {
+      return parentsList.filter(p => p.role === 'admin' || p.role === 'superadmin');
+    }
+    if (role === 'distributor') {
+      return parentsList.filter(p => p.role === 'super_stockist');
+    }
+    if (role === 'shop' || role === 'employee') {
+      return parentsList.filter(p => p.role === 'super_stockist' || p.role === 'distributor');
+    }
+    return parentsList;
+  };
+
+  const handleRoleChange = (newRole: string) => {
+    setRole(newRole);
+    setParentId(''); // Reset parent selection when role changes to avoid invalid uplink mapping
+  };
+
   const handleGetLocation = () => {
     if (!navigator.geolocation) {
       alert('Geolocation is not supported by your browser');
@@ -83,6 +106,7 @@ export default function CreateUserPage() {
       setLocation('');
       setLatitude(null);
       setLongitude(null);
+      setParentId('');
       setTimeout(() => setMessage(''), 4000);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Failed to create user account.');
@@ -91,13 +115,15 @@ export default function CreateUserPage() {
     }
   };
 
+  const filteredParents = getFilteredParents();
+
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-5xl mx-auto text-slate-800 bg-slate-50 min-h-screen">
       <div>
         <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
           <UserPlus className="w-8 h-8 text-amber-600" /> Provision Downline User & Geolocation
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Create accounts for network tiers. GPS mapping is enabled exclusively for Retail Shops.</p>
+        <p className="text-sm text-slate-500 mt-1">Create accounts for network tiers with strict hierarchical uplink mapping.</p>
       </div>
 
       {message && (
@@ -151,7 +177,7 @@ export default function CreateUserPage() {
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Assign Role Tier</label>
               <select
                 value={role}
-                onChange={(e) => setRole(e.target.value)}
+                onChange={(e) => handleRoleChange(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               >
                 <option value="super_stockist">Super Stockist</option>
@@ -175,19 +201,28 @@ export default function CreateUserPage() {
               />
             </div>
 
-            {/* Parent Account Mapping */}
+            {/* Parent Account Mapping with Dynamic Filtering */}
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Assign Parent Uplink (Optional)</label>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                Assign Parent Uplink {role === 'admin' ? '(Not Required)' : `(Required for ${role.replace('_', ' ')})`}
+              </label>
               <select
                 value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                required={role !== 'admin'}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >
-                <option value="">-- No Direct Parent Uplink --</option>
-                {parentsList.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.role.toUpperCase()})</option>
+                <option value="">-- Select Authorized Parent Uplink --</option>
+                {filteredParents.map(p => (
+                  <option key={p.id} value={p.id}>{p.name} ({p.role.replace('_', ' ').toUpperCase()})</option>
                 ))}
               </select>
+              <p className="text-[10px] text-slate-400 mt-1">
+                {role === 'super_stockist' && 'Super Stockists must report directly to Admin accounts.'}
+                {role === 'distributor' && 'Distributors must report directly to Super Stockist accounts.'}
+                {(role === 'shop' || role === 'employee') && 'Retail Shops and Field Employees report to Super Stockists or Distributors.'}
+                {role === 'admin' && 'Admins operate independently at the apex level.'}
+              </p>
             </div>
           </div>
 
