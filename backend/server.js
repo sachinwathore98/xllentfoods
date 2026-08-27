@@ -731,3 +731,32 @@ async function upgradeEnquiriesTable() {
   }
 }
 upgradeEnquiriesTable();
+// --- FETCH DOWNLINE USERS SCOPED BY HIERARCHY (EXCLUDING EMPLOYEES) ---
+app.get('/api/admin/downline-users', async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    // Superadmin and Admin see all downstream accounts (excluding employees)
+    if (role === 'admin' || role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
+      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
+      return res.json({ users: result.rows });
+    }
+
+    // Recursive query for Super Stockists and Distributors to see strictly their downstream network
+    const result = await pool.query(`
+      WITH RECURSIVE downline AS (
+        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1 AND role != 'employee'
+        UNION
+        SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
+        JOIN downline d ON u.parent_id = d.id
+        WHERE u.role != 'employee'
+      )
+      SELECT * FROM downline ORDER BY role, name ASC
+    `, [userId]);
+
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error('Fetch Downline Users Error:', err);
+    res.status(500).json({ message: 'Failed to fetch downline users' });
+  }
+});
