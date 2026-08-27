@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, ShieldCheck, TrendingUp, Users, ArrowRight, Sparkles, Zap } from 'lucide-react';
+import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, ArrowRight, Sparkles, Zap } from 'lucide-react';
 
 const SLIDER_IMAGES = [
   '/images/slider-1.png',
@@ -21,7 +21,7 @@ export default function HomePage() {
   const [cart, setCart] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Auto slide effect every 4 seconds with smooth transition
+  // Auto slide effect every 4.5 seconds with smooth transition
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % SLIDER_IMAGES.length);
@@ -97,23 +97,21 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
 
-      {/* 1. Full-Width Edge-to-Edge Hero Slider Banner with Animated Transition */}
+      {/* 1. Full-Width Edge-to-Edge Hero Slider Banner (Natural Width Scaling) */}
       <section className="relative w-full overflow-hidden bg-slate-950 shadow-md">
-        <div className="relative w-full h-[220px] sm:h-[420px] md:h-[500px] lg:h-[560px]">
+        <div className="relative w-full">
           {SLIDER_IMAGES.map((img, index) => (
             <div
               key={index}
-              className={`absolute inset-0 w-full h-full transition-opacity duration-1000 ease-in-out ${
-                index === currentSlide ? 'opacity-150 z-10' : 'opacity-0 z-0 pointer-events-none'
+              className={`transition-opacity duration-1000 ease-in-out ${
+                index === currentSlide ? 'opacity-100 relative block' : 'opacity-0 absolute inset-0 hidden'
               }`}
             >
               <img 
                 src={img} 
                 alt={`Banner ${index + 1}`} 
-                className="w-full h-full object-cover object-center" 
+                className="w-full h-auto object-contain block mx-auto" 
               />
-              {/* Subtle dark gradient overlay for text and depth */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"></div>
             </div>
           ))}
         </div>
