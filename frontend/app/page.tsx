@@ -38,7 +38,7 @@ export default function HomePage() {
       setLoading(true);
       const [catRes, prodRes] = await Promise.all([
         API.get('/api/categories').catch(() => ({ data: { categories: [] } })),
-        API.get('/api/admin/products').catch(() => ({ data: { products: [] } }))
+        API.get('/api/products/public').catch(() => ({ data: { products: [] } }))
       ]);
 
       setCategories(catRes.data.categories || []);
@@ -54,12 +54,14 @@ export default function HomePage() {
     setSelectedCategory(categoryName);
     try {
       setLoading(true);
-      const endpoint = categoryName === 'All' 
-        ? '/api/admin/products' 
-        : `/api/admin/products?category=${encodeURIComponent(categoryName)}`;
+      // Fetch public products and filter locally or via query
+      const res = await API.get('/api/products/public');
+      let allProds = res.data.products || [];
       
-      const res = await API.get(endpoint);
-      setProducts(res.data.products || []);
+      if (categoryName !== 'All') {
+        allProds = allProds.filter((p: any) => p.category?.toLowerCase() === categoryName.toLowerCase());
+      }
+      setProducts(allProds);
     } catch (err) {
       console.error('Error filtering products', err);
     } finally {
@@ -97,7 +99,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
 
-      {/* 1. Full-Width Edge-to-Edge Hero Slider Banner (Natural Width Scaling) */}
+      {/* 1. Full-Width Edge-to-Edge Hero Slider Banner */}
       <section className="relative w-full overflow-hidden bg-slate-950 shadow-md">
         <div className="relative w-full">
           {SLIDER_IMAGES.map((img, index) => (
@@ -116,7 +118,7 @@ export default function HomePage() {
           ))}
         </div>
         {/* Slider Indicator Dots */}
-        <div className="absolute bottom-4 left-0 right-0 z-20 flex justify-center gap-2">
+        <div className="absolute bottom-3 left-0 right-0 z-20 flex justify-center gap-2">
           {SLIDER_IMAGES.map((_, idx) => (
             <button
               key={idx}
@@ -129,9 +131,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. Amazon / Flipkart Style Search & Filter Floating Bar */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full -mt-6 sm:-mt-8 relative z-30">
-        <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-xl border border-slate-200/80 flex flex-col md:flex-row justify-between items-center gap-4 backdrop-blur-md">
+      {/* 2. Search & Filter Bar (Clean Spacing with No Overlap) */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full pt-6">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-md border border-slate-200/80 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="w-full md:w-[420px]">
             <div className="relative">
               <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
@@ -179,7 +181,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Main E-Commerce Catalog Grid & Animated Cards */}
+      {/* 3. Main E-Commerce Catalog Grid */}
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
@@ -193,7 +195,7 @@ export default function HomePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           
-          {/* Products Grid (2 cols on mobile, 3 cols on laptop) */}
+          {/* Products Grid */}
           <div className="lg:col-span-3">
             {loading ? (
               <div className="text-center py-20 text-slate-400 text-xs font-semibold animate-pulse">Loading store inventory...</div>
@@ -248,7 +250,7 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Sidebar Quick Cart (Amazon / Flipkart Style Sticky Sidebar) */}
+          {/* Sidebar Quick Cart */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm sticky top-24">
               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
