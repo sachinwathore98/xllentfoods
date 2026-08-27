@@ -82,14 +82,14 @@ export default function ProductsPage() {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between">
       <Navbar />
 
-      <main className="flex-grow max-w-7xl mx-auto px-6 py-12 w-full">
+      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-8 sm:py-12 w-full">
         {/* Catalog Banner */}
-        <div className="bg-slate-900 text-white p-8 sm:p-12 rounded-3xl mb-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl">
+        <div className="bg-slate-900 text-white p-6 sm:p-12 rounded-3xl mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6 shadow-xl">
           <div>
-            <span className="text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+            <span className="text-[10px] sm:text-xs font-bold text-amber-400 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
               Wholesale & Retail Portal
             </span>
-            <h1 className="text-3xl sm:text-4xl font-black mt-3 tracking-tight">Xllent Foods Catalog</h1>
+            <h1 className="text-2xl sm:text-4xl font-black mt-3 tracking-tight">Xllent Foods Catalog</h1>
             <p className="text-xs sm:text-sm text-slate-300 mt-2">
               Browse live inventory items, wholesale tiers, and place direct distribution orders.
             </p>
@@ -109,7 +109,7 @@ export default function ProductsPage() {
         </div>
 
         {/* Filter Controls Bar (Category Buttons + Select Dropdown + Sort Options) */}
-        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 mb-10 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="flex flex-col lg:flex-row justify-between items-stretch lg:items-center gap-4 mb-8 bg-white p-4 rounded-3xl border border-slate-200 shadow-sm">
           
           {/* Category Horizontal Pills */}
           <div className="flex items-center gap-2 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
@@ -139,16 +139,16 @@ export default function ProductsPage() {
           </div>
 
           {/* Right Controls: Category Dropdown & Sorting */}
-          <div className="flex items-center gap-3 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+          <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
             {/* Category Select Dropdown */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-none">
+              <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <select
                 value={selectedCategory}
                 onChange={(e) => handleCategoryChange(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer w-full"
               >
-                <option value="All">Select Category (All)</option>
+                <option value="All">Category: All</option>
                 {categories.map((cat) => (
                   <option key={cat.id} value={cat.name}>{cat.name}</option>
                 ))}
@@ -156,12 +156,12 @@ export default function ProductsPage() {
             </div>
 
             {/* Sort Options Dropdown */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
-              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 flex-1 sm:flex-none">
+              <ArrowUpDown className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer"
+                className="bg-transparent text-xs font-bold text-slate-700 focus:outline-none cursor-pointer w-full"
               >
                 <option value="default">Sort By: Featured</option>
                 <option value="low-high">Price: Low to High</option>
@@ -174,6 +174,8 @@ export default function ProductsPage() {
 
         {/* Products Grid & Cart Layout */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Products Column */}
           <div className="lg:col-span-2">
             {loading ? (
               <div className="text-center py-20 text-slate-400 text-xs font-semibold">Loading live inventory...</div>
@@ -182,39 +184,40 @@ export default function ProductsPage() {
                 No products found matching your criteria.
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              /* MOBILE & LAPTOP GRID VIEW: grid-cols-2 ensures 2 items per row on phones, sm:grid-cols-2 md:grid-cols-3 */
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-6">
                 {filteredProducts.map((product) => (
-                  <div key={product.id} className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
+                  <div key={product.id} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
                     <div>
-                      <div className="h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                      <div className="h-32 sm:h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                         {product.image ? (
                           <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
                         ) : (
-                          <Package className="w-12 h-12 text-slate-300" />
+                          <Package className="w-10 h-10 text-slate-300" />
                         )}
-                        <span className="absolute top-3 left-3 bg-white/90 backdrop-blur-md text-slate-800 text-[10px] font-bold px-2.5 py-1 rounded-lg uppercase">
+                        <span className="absolute top-2 left-2 sm:top-3 sm:left-3 bg-white/90 backdrop-blur-md text-slate-800 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg uppercase">
                           {product.category || 'FMCG'}
                         </span>
                       </div>
-                      <div className="p-5">
-                        <h3 className="font-extrabold text-slate-900 text-base">{product.name}</h3>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">SKU: {product.sku || 'N/A'}</p>
-                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">{product.description || 'Premium quality FMCG product.'}</p>
+                      <div className="p-3 sm:p-5">
+                        <h3 className="font-extrabold text-slate-900 text-xs sm:text-base truncate">{product.name}</h3>
+                        <p className="text-[10px] sm:text-[11px] text-slate-400 font-mono mt-0.5 truncate">SKU: {product.sku || 'N/A'}</p>
+                        <p className="text-[11px] sm:text-xs text-slate-500 mt-1 sm:mt-2 line-clamp-2">{product.description || 'Premium quality FMCG product.'}</p>
                         
-                        <div className="mt-3 text-[10px] text-slate-600 bg-amber-50 p-2 rounded-xl border border-amber-100 flex justify-between font-semibold">
+                        <div className="mt-2 sm:mt-3 text-[9px] sm:text-[10px] text-slate-600 bg-amber-50 p-1.5 sm:p-2 rounded-xl border border-amber-100 flex flex-col sm:flex-row justify-between font-semibold gap-0.5">
                           <span>📦 Pkt: {product.pieces_per_packet || 1} Pcs</span>
                           <span>📦 Ctn: {product.packets_per_carton || 1} Pkts</span>
                         </div>
                       </div>
                     </div>
-                    <div className="p-5 pt-0 flex justify-between items-center border-t border-slate-100 mt-4">
+                    <div className="p-3 sm:p-5 pt-0 flex flex-col sm:flex-row justify-between items-start sm:items-center border-t border-slate-100 mt-2 sm:mt-4 gap-2">
                       <div>
-                        <span className="text-[10px] uppercase font-bold text-slate-400 block">MRP</span>
-                        <span className="text-base font-black text-slate-900">₹{product.mrp}</span>
+                        <span className="text-[9px] sm:text-[10px] uppercase font-bold text-slate-400 block">MRP</span>
+                        <span className="text-sm sm:text-base font-black text-slate-900">₹{product.mrp}</span>
                       </div>
                       <button
                         onClick={() => addToCart(product)}
-                        className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 cursor-pointer shadow-sm"
+                        className="w-full sm:w-auto px-3 py-2 sm:px-4 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-[11px] sm:text-xs transition flex items-center justify-center gap-1 cursor-pointer shadow-sm"
                       >
                         <Plus className="w-3.5 h-3.5" /> Add
                       </button>
@@ -255,6 +258,7 @@ export default function ProductsPage() {
               </div>
             )}
           </div>
+
         </div>
       </main>
 
