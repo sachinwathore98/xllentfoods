@@ -680,3 +680,54 @@ app.use((err, req, res, next) => {
 // --- SERVER LISTENER ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+
+// --- PARTNERSHIP ENQUIRIES MANAGEMENT ---
+app.get('/api/admin/enquiries', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM partnership_enquiries ORDER BY created_at DESC");
+    res.json({ enquiries: result.rows });
+  } catch (err) {
+    console.error('Fetch Enquiries Error:', err);
+    res.status(500).json({ message: 'Failed to fetch partnership enquiries' });
+  }
+});
+
+app.put('/api/admin/enquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fullName, email, phone, roleType, location, message, status } = req.body;
+    const result = await pool.query(
+      `UPDATE partnership_enquiries 
+       SET full_name = $1, email = $2, phone = $3, role_type = $4, location = $5, message = $6, status = $7 
+       WHERE id = $8 RETURNING *`,
+      [fullName, email, phone, roleType, location, message, status || 'Pending', id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Enquiry not found' });
+    res.json({ message: 'Enquiry updated successfully', enquiry: result.rows[0] });
+  } catch (err) {
+    console.error('Update Enquiry Error:', err);
+    res.status(500).json({ message: 'Failed to update enquiry' });
+  }
+});
+
+app.delete('/api/admin/enquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM partnership_enquiries WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Enquiry not found' });
+    res.json({ message: 'Enquiry deleted successfully' });
+  } catch (err) {
+    console.error('Delete Enquiry Error:', err);
+    res.status(500).json({ message: 'Failed to delete enquiry' });
+  }
+});
+
+// Also make sure status column exists in partnership_enquiries table
+async function upgradeEnquiriesTable() {
+  try {
+    await pool.query("ALTER TABLE partnership_enquiries ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending'");
+  } catch (e) {
+    console.error("Migration error:", e);
+  }
+}
+upgradeEnquiriesTable();
