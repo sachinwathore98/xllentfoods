@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API = axios.create({
-  baseURL: 'https://xellent-dms-backend.onrender.com/api',
+  baseURL: 'https://xellent-dms-backend.onrender.com',
   headers: { 
     'Content-Type': 'application/json' 
   },
