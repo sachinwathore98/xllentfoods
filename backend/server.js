@@ -805,3 +805,141 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     res.status(500).json({ message: 'Failed to delete user account' });
   }
 });
+
+// --- DATABASE UPGRADE FOR EXPIRY, DISCOUNTS, & INVENTORY DETAILS ---
+async function upgradeSystemSchema() {
+  try {
+    await pool.query(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date DATE;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS ingredients TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS nutritional_info TEXT;
+
+      CREATE TABLE IF NOT EXISTS order_discounts (
+        id SERIAL PRIMARY KEY,
+        order_id INT REFERENCES orders(id) ON DELETE CASCADE,
+        discount_type VARCHAR(50), -- 'percentage', 'flat', 'bonus'
+        discount_value NUMERIC(10,2) DEFAULT 0,
+        waver_amount NUMERIC(10,2) DEFAULT 0,
+        bonus_items TEXT
+      );
+
+      CREATE TABLE IF NOT EXISTS partner_discounts (
+        id SERIAL PRIMARY KEY,
+        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        downstream_id INT REFERENCES users(id) ON DELETE CASCADE,
+        discount_percentage NUMERIC(5,2) DEFAULT 0,
+        flat_discount NUMERIC(10,2) DEFAULT 0,
+        min_billing_threshold NUMERIC(10,2) DEFAULT 0,
+        bonus_product_id INT REFERENCES products(id),
+        UNIQUE(user_id, downstream_id)
+      );
+    `);
+  } catch (err) {
+    console.error("Schema Upgrade Error:", err);
+  }
+}
+upgradeSystemSchema();
+
+// --- SMART ORDER ROUTING WITH FALLBACK TO ADMIN ---
+app.post('/api/orders/smart', async (req, res) => {
+  try {
+    const { buyerId, items, totalAmount, proxyForId } = req.body;
+    const actualBuyerId = proxyForId || buyerId;
+    
+    const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [actualBuyerId]);
+    if (buyerRes.rows.length === 0) return res.status(404).json({ message: 'Buyer not found' });
+    const buyer = buyerRes.rows[0];
+
+    let targetSellerId = buyer.parent_id;
+
+    // Fallback logic: If distributor has no parent super stockist, route directly to Admin
+    if (!targetSellerId) {
+      if (buyer.role === 'distributor') {
+        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
+        if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
+      } else if (buyer.role === 'shop') {
+        const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
+        if (distQuery.rows.length > 0) {
+          targetSellerId = distQuery.rows[0].id;
+        } else {
+          const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
+          if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+          else {
+            const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
+            if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
+          }
+        }
+      } else if (buyer.role === 'super_stockist') {
+        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
+        if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
+      }
+    }
+
+    const orderResult = await pool.query(
+      "INSERT INTO orders (buyer_id, seller_id, total_amount, status) VALUES ($1, $2, $3, $4) RETURNING id",
+      [actualBuyerId, targetSellerId || null, totalAmount, 'Pending']
+    );
+    const orderId = orderResult.rows[0].id;
+
+    for (let item of items) {
+      await pool.query(
+        "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+        [orderId, item.productId, item.quantity, item.unitPrice]
+      );
+    }
+
+    res.status(201).json({ message: 'Order routed successfully through supply chain hierarchy', orderId, assignedSellerId: targetSellerId });
+  } catch (err) {
+    console.error('Smart Order Error:', err);
+    res.status(500).json({ message: 'Failed to place smart order' });
+  }
+});
+
+// --- EXPIRY ALERTS NOTIFICATIONS ROUTE ---
+app.get('/api/notifications/expiry/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    // Check products approaching 60-day refund window / expiration within 15 days
+    const result = await pool.query(`
+      SELECT id, name, sku, expiry_date, 
+             (expiry_date - CURRENT_DATE) as days_remaining
+      FROM products
+      WHERE expiry_date IS NOT NULL AND expiry_date <= CURRENT_DATE + INTERVAL '15 days'
+      ORDER BY expiry_date ASC
+    `);
+    res.json({ alerts: result.rows });
+  } catch (err) {
+    console.error('Expiry Notification Error:', err);
+    res.status(500).json({ message: 'Failed to fetch expiry notifications' });
+  }
+});
+
+// --- PARTNER OFFERS & DISCOUNT CONFIGURATION ---
+app.get('/api/partner-discounts/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query("SELECT * FROM partner_discounts WHERE user_id = $1", [userId]);
+    res.json({ discounts: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch discounts' });
+  }
+});
+
+app.post('/api/partner-discounts', async (req, res) => {
+  try {
+    const { userId, downstreamId, discountPercentage, flatDiscount, minBillingThreshold, bonusProductId } = req.body;
+    await pool.query(`
+      INSERT INTO partner_discounts (user_id, downstream_id, discount_percentage, flat_discount, min_billing_threshold, bonus_product_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      ON CONFLICT (user_id, downstream_id)
+      DO UPDATE SET discount_percentage = EXCLUDED.discount_percentage,
+                    flat_discount = EXCLUDED.flat_discount,
+                    min_billing_threshold = EXCLUDED.min_billing_threshold,
+                    bonus_product_id = EXCLUDED.bonus_product_id
+    `, [userId, downstreamId, discountPercentage || 0, flatDiscount || 0, minBillingThreshold || 0, bonusProductId || null]);
+    res.json({ message: 'Partner discount offer saved successfully' });
+  } catch (err) {
+    console.error('Save Discount Error:', err);
+    res.status(500).json({ message: 'Failed to save discount offer' });
+  }
+});
