@@ -193,7 +193,7 @@ export default function HomePage() {
                         </div>
                       </a>
                       <div className="p-4 sm:p-5">
-                        <a href={`/products/${product.id}`} target="_blank" rel="noopener noreferrer">
+                        <a href={`/products/${product.id}`}>
                           <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate group-hover:text-amber-600 transition">{product.name}</h3>
                         </a>
                         <p className="text-xs text-slate-400 font-mono mt-1">SKU: {product.sku || 'N/A'}</p>
