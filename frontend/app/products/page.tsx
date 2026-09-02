@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { Package, Search, ShoppingCart, Plus, SlidersHorizontal, ArrowUpDown, ExternalLink } from 'lucide-react';
+import { Package, Search, ShoppingCart, Plus, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 
 export default function ProductsPage() {
   const [products, setProducts] = useState<any[]>([]);
@@ -153,7 +153,7 @@ export default function ProductsPage() {
                 {filteredProducts.map((product) => (
                   <div key={product.id} className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition flex flex-col justify-between">
                     <div>
-                      <a href={`/products/${product.id}`} target="_blank" rel="noopener noreferrer" className="block relative">
+                      <a href={`/products/${product.id}`} className="block relative">
                         <div className="h-36 sm:h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                           {product.image ? (
                             <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
@@ -166,7 +166,7 @@ export default function ProductsPage() {
                         </div>
                       </a>
                       <div className="p-4 sm:p-5">
-                        <a href={`/products/${product.id}`} target="_blank" rel="noopener noreferrer">
+                        <a href={`/products/${product.id}`}>
                           <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate hover:text-amber-600 transition">{product.name}</h3>
                         </a>
                         <p className="text-xs text-slate-400 font-mono mt-1 truncate">SKU: {product.sku || 'N/A'}</p>
