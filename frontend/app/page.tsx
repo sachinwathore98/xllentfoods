@@ -1,9 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, ArrowRight, Sparkles, Zap, ExternalLink } from 'lucide-react';
+import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, ArrowRight, Sparkles, Zap } from 'lucide-react';
 
 const SLIDER_IMAGES = [
   '/images/slider-1.png',
@@ -177,7 +178,8 @@ export default function HomePage() {
                 {filteredProducts.map((product) => (
                   <div key={product.id} className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between group">
                     <div>
-                      <a href={`/products/${product.id}`} target="_blank" rel="noopener noreferrer" className="block relative">
+                      {/* Using Next.js Link component forces same-tab navigation */}
+                      <Link href={`/products/${product.id}`} className="block relative">
                         <div className="h-36 sm:h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                           {product.image ? (
                             <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
@@ -187,15 +189,12 @@ export default function HomePage() {
                           <span className="absolute top-2 left-2 bg-white/95 backdrop-blur-md text-slate-800 text-[11px] font-extrabold px-2.5 py-1 rounded-md uppercase shadow-sm border border-slate-100">
                             {product.category || 'FMCG'}
                           </span>
-                          <span className="absolute top-2 right-2 bg-slate-900/80 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition">
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          </span>
                         </div>
-                      </a>
+                      </Link>
                       <div className="p-4 sm:p-5">
-                        <a href={`/products/${product.id}`}>
+                        <Link href={`/products/${product.id}`}>
                           <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate group-hover:text-amber-600 transition">{product.name}</h3>
-                        </a>
+                        </Link>
                         <p className="text-xs text-slate-400 font-mono mt-1">SKU: {product.sku || 'N/A'}</p>
                         <p className="text-xs sm:text-sm text-slate-500 mt-2 line-clamp-2 font-light">{product.description || 'Premium quality FMCG product.'}</p>
                         
