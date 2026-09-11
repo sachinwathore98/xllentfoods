@@ -253,7 +253,7 @@ app.post('/api/admin/users/create', async (req, res) => {
 app.get('/api/admin/financial-overview', async (req, res) => {
   try {
     const productStats = await pool.query("SELECT COUNT(*) as total_products, SUM(mrp) as total_mrp_value FROM products");
-    const userStats = await pool.query("SELECT COUNT(*) as total_users WHERE role != 'superadmin'");
+    const userStats = await pool.query("SELECT COUNT(*) as total_users FROM users WHERE role != 'superadmin'");
     const enquiryStats = await pool.query("SELECT COUNT(*) as total_enquiries FROM partnership_enquiries");
 
     res.json({
@@ -462,7 +462,7 @@ app.get('/api/orders', async (req, res) => {
     `;
 
     let params = [];
-    if (role && role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
+    if (role && role !== 'admin' && role !== 'superadmin') {
       query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1`;
       params.push(userId);
     }
@@ -538,24 +538,22 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-// --- FETCH DOWNLINE USERS SCOPED BY HIERARCHY (RESTORED & STRICTLY SCOPED) ---
+// --- FETCH DOWNLINE USERS SCOPED BY PARENT ID ---
 app.get('/api/admin/downline-users', async (req, res) => {
   try {
     const { userId, role } = req.query;
 
-    // Only master superadmin sees all non-employee accounts. Regular admins and other tiers see only their direct downstream network.
-    if (role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
-      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
+    if (role === 'admin' || role === 'superadmin') {
+      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role != 'superadmin' ORDER BY role, name ASC");
       return res.json({ users: result.rows });
     }
 
     const result = await pool.query(`
       WITH RECURSIVE downline AS (
-        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1 AND role != 'employee'
+        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1
         UNION
         SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
         JOIN downline d ON u.parent_id = d.id
-        WHERE u.role != 'employee'
       )
       SELECT * FROM downline ORDER BY role, name ASC
     `, [userId]);
@@ -722,6 +720,62 @@ async function upgradeEnquiriesTable() {
   }
 }
 upgradeEnquiriesTable();
+
+app.get('/api/admin/downline-users', async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    if (role === 'admin' || role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
+      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
+      return res.json({ users: result.rows });
+    }
+
+    const result = await pool.query(`
+      WITH RECURSIVE downline AS (
+        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1 AND role != 'employee'
+        UNION
+        SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
+        JOIN downline d ON u.parent_id = d.id
+        WHERE u.role != 'employee'
+      )
+      SELECT * FROM downline ORDER BY role, name ASC
+    `, [userId]);
+
+    res.json({ users: result.rows });
+  } catch (err) {
+    console.error('Fetch Downline Users Error:', err);
+    res.status(500).json({ message: 'Failed to fetch downline users' });
+  }
+});
+
+app.get('/api/orders', async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    let query = `
+      SELECT o.id, o.total_amount, o.status, o.created_at, 
+             b.id as buyer_id, b.name as buyer_name, b.email as buyer_email, b.role as buyer_role,
+             s.id as seller_id, s.name as seller_name, s.role as seller_role
+      FROM orders o
+      JOIN users b ON o.buyer_id = b.id
+      LEFT JOIN users s ON o.seller_id = s.id
+    `;
+
+    let params = [];
+    if (role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
+      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1 OR b.parent_id = $1`;
+      params.push(userId);
+    }
+
+    query += ` ORDER BY o.created_at DESC`;
+
+    const result = await pool.query(query, params);
+    res.json({ orders: result.rows });
+  } catch (err) {
+    console.error('Failed to fetch orders:', err);
+    res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+});
 
 app.delete('/api/admin/users/:id', async (req, res) => {
   try {
