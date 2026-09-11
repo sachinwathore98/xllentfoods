@@ -17,6 +17,7 @@ interface Product {
   description?: string;
   pieces_per_packet: number;
   packets_per_carton: number;
+  gst_percent: number;
 }
 
 interface Category {
@@ -43,6 +44,7 @@ export default function InventoryPage() {
   const [description, setDescription] = useState('');
   const [piecesPerPacket, setPiecesPerPacket] = useState<number>(1);
   const [packetsPerCarton, setPacketsPerCarton] = useState<number>(1);
+  const [gstPercent, setGstPercent] = useState<number>(0);
   const [status, setStatus] = useState('In Stock');
   const [message, setMessage] = useState('');
 
@@ -107,7 +109,7 @@ export default function InventoryPage() {
     e.preventDefault();
     const payload = { 
       name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, 
-      status, image, description, piecesPerPacket, packetsPerCarton 
+      status, image, description, piecesPerPacket, packetsPerCarton, gstPercent 
     };
     try {
       if (editingProductId) {
@@ -156,13 +158,14 @@ export default function InventoryPage() {
     setDescription(prod.description || '');
     setPiecesPerPacket(prod.pieces_per_packet || 1);
     setPacketsPerCarton(prod.packets_per_carton || 1);
+    setGstPercent(prod.gst_percent || 0);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetProductForm = () => {
     setEditingProductId(null);
     setName(''); setSku(''); setMrp(0); setSuperStockistPrice(0); setDistributorPrice(0); setShopPrice(0); setImage(''); setDescription('');
-    setPiecesPerPacket(1); setPacketsPerCarton(1);
+    setPiecesPerPacket(1); setPacketsPerCarton(1); setGstPercent(0);
   };
 
   return (
@@ -171,7 +174,7 @@ export default function InventoryPage() {
         <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
           <Package className="w-8 h-8 text-amber-600" /> Inventory, Categories & Multi-Tier Pricing
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Manage categories, product descriptions, packing ratios, and tier pricing structures.</p>
+        <p className="text-sm text-slate-500 mt-1">Manage categories, product descriptions, packing ratios, GST percentages, and tier pricing structures.</p>
       </div>
 
       {message && <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold rounded-xl">{message}</div>}
@@ -252,7 +255,7 @@ export default function InventoryPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">MRP (₹)</label>
                 <input type="number" value={mrp} onChange={(e) => setMrp(Number(e.target.value))} required className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-xs outline-none" />
@@ -268,6 +271,10 @@ export default function InventoryPage() {
               <div>
                 <label className="block text-xs font-bold text-emerald-700 uppercase mb-1">Shop Price (₹)</label>
                 <input type="number" value={shopPrice} onChange={(e) => setShopPrice(Number(e.target.value))} required className="w-full px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-xs outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-purple-700 uppercase mb-1">GST %</label>
+                <input type="number" step="0.01" value={gstPercent} onChange={(e) => setGstPercent(Number(e.target.value))} required placeholder="e.g. 5, 12, 18" className="w-full px-3 py-2 bg-purple-50 border border-purple-200 rounded-xl text-xs outline-none" />
               </div>
             </div>
 
@@ -315,9 +322,10 @@ export default function InventoryPage() {
                 {p.image && <img src={p.image} alt={p.name} className="w-full h-36 object-cover rounded-xl mb-3 bg-white" />}
                 <div className="flex justify-between items-center mb-1">
                   <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100 text-amber-800 rounded-md uppercase">{p.category}</span>
-                  <span className="text-xs font-bold text-slate-500">MRP: ₹{p.mrp}</span>
+                  <span className="text-xs font-bold text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">GST: {p.gst_percent || 0}%</span>
                 </div>
                 <h4 className="font-bold text-sm text-slate-900">{p.name}</h4>
+                <span className="text-xs font-bold text-slate-500 block mt-0.5">MRP: ₹{p.mrp}</span>
                 {p.description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.description}</p>}
                 
                 {/* Packaging Details Badge */}

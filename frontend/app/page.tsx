@@ -94,6 +94,15 @@ export default function HomePage() {
     filteredProducts.sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  // Calculate Subtotal, GST, and Grand Total
+  const cartSubtotal = cart.reduce((acc, item) => acc + (item.quantity * Number(item.mrp)), 0);
+  const totalGstAmount = cart.reduce((acc, item) => {
+    const itemTotal = item.quantity * Number(item.mrp);
+    const gstRate = Number(item.gst_percent || 0);
+    return acc + (itemTotal * (gstRate / 100));
+  }, 0);
+  const cartGrandTotal = cartSubtotal + totalGstAmount;
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
@@ -206,7 +215,10 @@ export default function HomePage() {
                             <Link href={`/products/${product.id}`}>
                               <h3 className="font-extrabold text-slate-900 text-xs sm:text-sm truncate group-hover:text-amber-600 transition">{product.name}</h3>
                             </Link>
-                            <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {product.sku || 'N/A'}</p>
+                            <div className="flex justify-between items-center mt-0.5">
+                              <span className="text-[10px] text-slate-400 font-mono">SKU: {product.sku || 'N/A'}</span>
+                              <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded">GST {product.gst_percent || 0}%</span>
+                            </div>
                             <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 font-light">{product.description || 'Premium quality FMCG product.'}</p>
                             
                             <div className="mt-2 text-[10px] text-slate-600 bg-amber-50 p-2 rounded-xl border border-amber-100 flex flex-col gap-0.5 font-semibold">
@@ -261,16 +273,29 @@ export default function HomePage() {
                     <div key={item.id} className="flex justify-between items-center text-xs sm:text-sm border-b border-slate-100 pb-2">
                       <div>
                         <p className="font-bold text-slate-900 truncate max-w-[120px]">{item.name}</p>
-                        <p className="text-slate-400 text-xs">Qty: {item.quantity} × ₹{item.mrp}</p>
+                        <p className="text-slate-400 text-xs">Qty: {item.quantity} × ₹{item.mrp} <span className="text-purple-600 font-bold">({item.gst_percent || 0}% GST)</span></p>
                       </div>
                       <p className="font-black text-slate-900">₹{item.quantity * item.mrp}</p>
                     </div>
                   ))}
-                  <div className="pt-3 flex justify-between items-center font-black text-sm sm:text-base border-t border-slate-200">
-                    <span>Subtotal:</span>
-                    <span className="text-amber-600">₹{cart.reduce((acc, item) => acc + (item.quantity * item.mrp), 0)}</span>
+
+                  {/* Bill Breakdown with GST */}
+                  <div className="pt-3 space-y-1.5 border-t border-slate-200 text-xs sm:text-sm">
+                    <div className="flex justify-between text-slate-600">
+                      <span>Subtotal:</span>
+                      <span className="font-bold">₹{cartSubtotal.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-slate-600">
+                      <span>Total GST Applicable:</span>
+                      <span className="font-bold text-purple-700">+ ₹{totalGstAmount.toFixed(2)}</span>
+                    </div>
+                    <div className="pt-2 flex justify-between items-center font-black text-sm sm:text-base border-t border-slate-200">
+                      <span>Grand Total:</span>
+                      <span className="text-amber-600">₹{cartGrandTotal.toFixed(2)}</span>
+                    </div>
                   </div>
-                  <a href="/login" className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm uppercase tracking-wider block text-center shadow-lg transition hover:scale-[1.02]">
+
+                  <a href="/login" className="w-full py-3.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm uppercase tracking-wider block text-center shadow-lg transition hover:scale-[1.02] mt-3">
                     Proceed to Checkout
                   </a>
                 </div>
