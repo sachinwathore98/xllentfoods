@@ -943,3 +943,65 @@ app.post('/api/partner-discounts', async (req, res) => {
     res.status(500).json({ message: 'Failed to save discount offer' });
   }
 });
+
+// --- DATABASE UPGRADE FOR ADVERTISEMENTS ---
+async function upgradeAdsSchema() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS advertisements (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255),
+        image_url TEXT NOT NULL,
+        target_url TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+  } catch (err) {
+    console.error("Ads Schema Upgrade Error:", err);
+  }
+}
+upgradeAdsSchema();
+
+// --- ADVERTISEMENT MANAGEMENT ROUTES ---
+app.get('/api/admin/advertisements', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM advertisements ORDER BY created_at DESC");
+    res.json({ advertisements: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch advertisements' });
+  }
+});
+
+app.post('/api/admin/advertisements', async (req, res) => {
+  try {
+    const { title, imageUrl, targetUrl } = req.body;
+    const result = await pool.query(
+      "INSERT INTO advertisements (title, image_url, target_url) VALUES ($1, $2, $3) RETURNING *",
+      [title, imageUrl, targetUrl]
+    );
+    res.status(201).json({ message: 'Advertisement banner added successfully', advertisement: result.rows[0] });
+  } catch (err) {
+    console.error('Add Ad Error:', err);
+    res.status(500).json({ message: 'Failed to add advertisement banner' });
+  }
+});
+
+app.delete('/api/admin/advertisements/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM advertisements WHERE id = $1", [id]);
+    res.json({ message: 'Advertisement banner deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete advertisement banner' });
+  }
+});
+
+app.get('/api/advertisements/public', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM advertisements WHERE is_active = TRUE ORDER BY created_at DESC");
+    res.json({ advertisements: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch public advertisements' });
+  }
+});
