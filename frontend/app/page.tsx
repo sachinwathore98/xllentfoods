@@ -95,20 +95,20 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
 
-      {/* 1. Responsive Hero Slider Banner (Bigger/Taller on Mobile, Sleek on Desktop) */}
+      {/* 1. Original Full-Width Edge-to-Edge Hero Slider Banner */}
       <section className="relative w-full overflow-hidden bg-slate-950 shadow-md">
-        <div className="relative w-full h-[280px] sm:h-[380px] lg:h-[450px]">
+        <div className="relative w-full">
           {SLIDER_IMAGES.map((img, index) => (
             <div
               key={index}
-              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
-                index === currentSlide ? 'opacity-100 z-10 block' : 'opacity-0 z-0 hidden'
+              className={`transition-opacity duration-1000 ease-in-out ${
+                index === currentSlide ? 'opacity-100 relative block' : 'opacity-0 absolute inset-0 hidden'
               }`}
             >
               <img 
                 src={img} 
                 alt={`Banner ${index + 1}`} 
-                className="w-full h-full object-cover sm:object-contain block mx-auto" 
+                className="w-full h-auto object-contain block mx-auto" 
               />
             </div>
           ))}
@@ -160,7 +160,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Main Catalog Section (5 per row on desktop, 2 per row on mobile) */}
+      {/* 3. Main Catalog Section (5 per row on desktop, 2 on mobile) */}
       <main className="flex-grow max-w-[90rem] mx-auto px-4 sm:px-6 py-8 w-full">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
@@ -173,7 +173,6 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Products Grid: 5 columns on desktop, 2 columns on mobile */}
           <div className="lg:col-span-3">
             {loading ? (
               <div className="text-center py-20 text-slate-400 text-sm font-semibold animate-pulse">Loading store inventory...</div>
@@ -229,7 +228,6 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Sidebar Quick Cart */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm sticky top-24">
               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
