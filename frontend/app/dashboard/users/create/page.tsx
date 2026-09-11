@@ -67,6 +67,7 @@ export default function CreateAndManageUsersPage() {
 
   const getFilteredParents = () => {
     if (role === 'admin') {
+      // Admins can have superadmin or no parent
       return parentsList.filter(p => p.role === 'superadmin');
     }
     if (role === 'super_stockist') {
@@ -284,15 +285,15 @@ export default function CreateAndManageUsersPage() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Assign Parent Uplink (Required for {role.replace('_', ' ')})
+                Assign Parent Uplink {role === 'admin' ? '(Optional for Top-Level Admin)' : `(Required for ${role.replace('_', ' ')})`}
               </label>
               <select
                 value={parentId}
                 onChange={(e) => setParentId(e.target.value)}
-                required
+                required={role !== 'admin'}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium"
               >
-                <option value="">-- Select Authorized Parent Uplink --</option>
+                <option value="">{role === 'admin' ? '-- No Parent (Top-Level System Admin) --' : '-- Select Authorized Parent Uplink --'}</option>
                 {filteredParents.map(p => (
                   <option key={p.id} value={p.id}>{p.name} ({p.role.replace('_', ' ').toUpperCase()})</option>
                 ))}
