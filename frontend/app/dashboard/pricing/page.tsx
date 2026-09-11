@@ -23,7 +23,8 @@ export default function DownstreamPricingPage() {
       const role = storedUser.role;
 
       const res = await API.get(`/api/admin/downline-users?userId=${userId}&role=${role}`);
-      const fetchedUsers = res.data.users || [];
+      // Exclude the logged-in user themselves from appearing in their own downstream pricing dropdown
+      const fetchedUsers = (res.data.users || []).filter((u: any) => u.id !== Number(userId));
       setUsers(fetchedUsers);
 
       if (fetchedUsers.length > 0) {
