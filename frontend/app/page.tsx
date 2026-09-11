@@ -95,16 +95,21 @@ export default function HomePage() {
     <div className="min-h-screen bg-slate-100 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
       <Navbar />
 
+      {/* 1. Responsive Hero Slider Banner (Bigger/Taller on Mobile, Sleek on Desktop) */}
       <section className="relative w-full overflow-hidden bg-slate-950 shadow-md">
-        <div className="relative w-full">
+        <div className="relative w-full h-[280px] sm:h-[380px] lg:h-[450px]">
           {SLIDER_IMAGES.map((img, index) => (
             <div
               key={index}
-              className={`transition-opacity duration-1000 ease-in-out ${
-                index === currentSlide ? 'opacity-100 relative block' : 'opacity-0 absolute inset-0 hidden'
+              className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+                index === currentSlide ? 'opacity-100 z-10 block' : 'opacity-0 z-0 hidden'
               }`}
             >
-              <img src={img} alt={`Banner ${index + 1}`} className="w-full h-auto object-contain block mx-auto" />
+              <img 
+                src={img} 
+                alt={`Banner ${index + 1}`} 
+                className="w-full h-full object-cover sm:object-contain block mx-auto" 
+              />
             </div>
           ))}
         </div>
@@ -115,7 +120,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 w-full pt-6">
+      {/* 2. Search & Filter Bar */}
+      <section className="max-w-[90rem] mx-auto px-4 sm:px-6 w-full pt-6">
         <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-md border border-slate-200/80 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="w-full md:w-[420px]">
             <div className="relative">
@@ -154,7 +160,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 py-8 w-full">
+      {/* 3. Main Catalog Section (5 per row on desktop, 2 per row on mobile) */}
+      <main className="flex-grow max-w-[90rem] mx-auto px-4 sm:px-6 py-8 w-full">
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-2">
             <span className="p-2 bg-amber-500/10 text-amber-600 rounded-xl"><Zap className="w-4 h-4" /></span>
@@ -166,6 +173,7 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Products Grid: 5 columns on desktop, 2 columns on mobile */}
           <div className="lg:col-span-3">
             {loading ? (
               <div className="text-center py-20 text-slate-400 text-sm font-semibold animate-pulse">Loading store inventory...</div>
@@ -174,46 +182,45 @@ export default function HomePage() {
                 No products found matching your search.
               </div>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 sm:gap-4">
                 {filteredProducts.map((product) => (
                   <div key={product.id} className="bg-white rounded-2xl border border-slate-200/80 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col justify-between group">
                     <div>
-                      {/* Using Next.js Link component forces same-tab navigation */}
                       <Link href={`/products/${product.id}`} className="block relative">
-                        <div className="h-36 sm:h-48 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                        <div className="h-32 sm:h-36 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                           {product.image ? (
                             <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
                           ) : (
-                            <Package className="w-10 h-10 text-slate-300" />
+                            <Package className="w-8 h-8 text-slate-300" />
                           )}
-                          <span className="absolute top-2 left-2 bg-white/95 backdrop-blur-md text-slate-800 text-[11px] font-extrabold px-2.5 py-1 rounded-md uppercase shadow-sm border border-slate-100">
+                          <span className="absolute top-1.5 left-1.5 bg-white/95 backdrop-blur-md text-slate-800 text-[10px] font-extrabold px-2 py-0.5 rounded uppercase shadow-sm border border-slate-100">
                             {product.category || 'FMCG'}
                           </span>
                         </div>
                       </Link>
-                      <div className="p-4 sm:p-5">
+                      <div className="p-3">
                         <Link href={`/products/${product.id}`}>
-                          <h3 className="font-extrabold text-slate-900 text-sm sm:text-base truncate group-hover:text-amber-600 transition">{product.name}</h3>
+                          <h3 className="font-extrabold text-slate-900 text-xs sm:text-sm truncate group-hover:text-amber-600 transition">{product.name}</h3>
                         </Link>
-                        <p className="text-xs text-slate-400 font-mono mt-1">SKU: {product.sku || 'N/A'}</p>
-                        <p className="text-xs sm:text-sm text-slate-500 mt-2 line-clamp-2 font-light">{product.description || 'Premium quality FMCG product.'}</p>
+                        <p className="text-[10px] text-slate-400 font-mono mt-0.5">SKU: {product.sku || 'N/A'}</p>
+                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 font-light">{product.description || 'Premium quality FMCG product.'}</p>
                         
-                        <div className="mt-3 text-xs text-slate-600 bg-amber-50 p-2.5 rounded-xl border border-amber-100 flex justify-between font-semibold">
+                        <div className="mt-2 text-[10px] text-slate-600 bg-amber-50 p-2 rounded-xl border border-amber-100 flex flex-col gap-0.5 font-semibold">
                           <span className="text-amber-700">📦 Pkt: {product.pieces_per_packet || 1} Pcs</span>
                           <span className="text-blue-700">📦 Ctn: {product.packets_per_carton || 1} Pkts</span>
                         </div>
                       </div>
                     </div>
-                    <div className="p-4 sm:p-5 pt-0 flex justify-between items-center border-t border-slate-100 mt-2">
+                    <div className="p-3 pt-0 flex justify-between items-center border-t border-slate-100 mt-2">
                       <div>
-                        <span className="text-[11px] uppercase font-bold text-slate-400 block">MRP</span>
-                        <span className="text-base sm:text-lg font-black text-slate-900">₹{product.mrp}</span>
+                        <span className="text-[10px] uppercase font-bold text-slate-400 block">MRP</span>
+                        <span className="text-xs sm:text-sm font-black text-slate-900">₹{product.mrp}</span>
                       </div>
                       <button
                         onClick={() => addToCart(product)}
-                        className="px-3.5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs sm:text-sm transition-all duration-200 flex items-center gap-1.5 cursor-pointer shadow-md hover:scale-105 active:scale-95"
+                        className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-xs transition-all duration-200 flex items-center gap-1 cursor-pointer shadow-md hover:scale-105 active:scale-95"
                       >
-                        <Plus className="w-4 h-4" /> Add
+                        <Plus className="w-3.5 h-3.5" /> Add
                       </button>
                     </div>
                   </div>
@@ -222,6 +229,7 @@ export default function HomePage() {
             )}
           </div>
 
+          {/* Sidebar Quick Cart */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm sticky top-24">
               <div className="flex items-center gap-2 mb-4 border-b border-slate-100 pb-3">
