@@ -10,17 +10,17 @@ export default function Footer() {
       {/* Main Footer Container */}
       <div className="max-w-7xl mx-auto px-6 py-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12">
         
-        {/* Brand & Mission Column */}
+        {/* Brand & Mission Column (Enlarged Footer Logo) */}
         <div className="space-y-4">
           {!imgError ? (
             <img 
               src="/images/logo.png" 
               alt="Xllent Foods Logo" 
-              className="h-12 w-auto object-contain brightness-0 invert"
+              className="h-16 w-auto object-contain brightness-0 invert"
               onError={() => setImgError(true)}
             />
           ) : (
-            <span className="text-xl font-black text-white tracking-tight block">XLLENT FOODS</span>
+            <span className="text-2xl font-black text-white tracking-tight block">XLLENT FOODS</span>
           )}
           <p className="text-xs text-slate-400 leading-relaxed font-light">
             Xllent Foods is a premier consumer packaged goods enterprise empowering Super Stockists, regional Distributors, and retail networks with unmatched profit margins and technology-driven logistics.
