@@ -1,8 +1,10 @@
 'use client';
-import Image from 'next/image';
+import { useState } from 'react';
 import { Phone, Mail, MapPin, ArrowRight } from 'lucide-react';
 
 export default function Footer() {
+  const [imgError, setImgError] = useState(false);
+
   return (
     <footer className="bg-slate-900 text-slate-300 font-sans border-t border-slate-800">
       {/* Main Footer Container */}
@@ -10,13 +12,16 @@ export default function Footer() {
         
         {/* Brand & Mission Column */}
         <div className="space-y-4">
-          <Image 
-            src="/images/logo.png" 
-            alt="Xllent Foods Logo" 
-            width={160} 
-            height={48}
-            className="h-12 w-auto object-contain brightness-0 invert"
-          />
+          {!imgError ? (
+            <img 
+              src="/images/logo.png" 
+              alt="Xllent Foods Logo" 
+              className="h-12 w-auto object-contain brightness-0 invert"
+              onError={() => setImgError(true)}
+            />
+          ) : (
+            <span className="text-xl font-black text-white tracking-tight block">XLLENT FOODS</span>
+          )}
           <p className="text-xs text-slate-400 leading-relaxed font-light">
             Xllent Foods is a premier consumer packaged goods enterprise empowering Super Stockists, regional Distributors, and retail networks with unmatched profit margins and technology-driven logistics.
           </p>
