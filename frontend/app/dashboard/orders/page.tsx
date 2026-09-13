@@ -72,7 +72,6 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // When partner is selected, fetch their customized/role-based pricing sheet
   const handlePartnerSelect = async (buyerId: string) => {
     setSelectedBuyerId(buyerId);
     if (!buyerId) {
@@ -169,7 +168,6 @@ export default function AdminOrdersPage() {
 
   return (
     <div className="w-full">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders & Downstream Feed</h1>
@@ -185,7 +183,6 @@ export default function AdminOrdersPage() {
         </button>
       </div>
 
-      {/* Orders Table Feed */}
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="text-center py-20 text-slate-400 text-xs font-bold animate-pulse">Loading orders feed...</div>
@@ -217,7 +214,7 @@ export default function AdminOrdersPage() {
                     <td className="p-4 font-black text-slate-900">₹{o.total_amount}</td>
                     <td className="p-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        o.status === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
+                        o.status === 'Completed' || o.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
                       }`}>
                         {o.status || 'Pending'}
                       </span>
@@ -238,6 +235,7 @@ export default function AdminOrdersPage() {
                         <option value="Processing">Processing</option>
                         <option value="Dispatched">Dispatched</option>
                         <option value="Completed">Completed</option>
+                        <option value="Approved">Approved</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
                     </td>
@@ -249,7 +247,7 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Create Order Modal with Product Images & Auto-Role Pricing */}
+      {/* Create Order Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
@@ -262,7 +260,6 @@ export default function AdminOrdersPage() {
             </div>
 
             <form onSubmit={handleCreateOrder} className="space-y-6">
-              {/* Partner Select */}
               <div>
                 <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Select Downstream Partner Account</label>
                 <select
@@ -278,7 +275,6 @@ export default function AdminOrdersPage() {
                 </select>
               </div>
 
-              {/* Category Filter Tabs */}
               <div className="space-y-3">
                 <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
                 <div className="flex flex-wrap gap-2">
@@ -305,7 +301,6 @@ export default function AdminOrdersPage() {
                   ))}
                 </div>
 
-                {/* Product Selection Grid with Images */}
                 <div className="border border-slate-200 rounded-2xl max-h-72 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3">
                   {filteredProducts.length === 0 ? (
                     <div className="text-center py-8 text-xs text-slate-400 font-medium">No products found in this category.</div>
@@ -348,7 +343,6 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Selected Order Summary Review with GST */}
               {orderItems.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
                   <div className="flex justify-between items-center">
@@ -372,7 +366,6 @@ export default function AdminOrdersPage() {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
                 <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Confirm & Place Order</button>
@@ -382,16 +375,18 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Invoice Modal / PDF Download with Logo & GST Bill */}
+      {/* Invoice Modal / PDF Download with Official Logo & GST Details */}
       {invoiceOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white text-slate-900 rounded-3xl w-full max-w-2xl p-8 space-y-6 shadow-2xl relative border border-slate-200 my-8">
             <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             
-            {/* Printable Invoice Header with Logo & GST */}
+            {/* Official Branded Header with Logo */}
             <div className="flex justify-between items-start border-b border-slate-200 pb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-slate-950 font-black text-lg shadow-md">XF</div>
+              <div className="flex items-center gap-3.5">
+                <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-amber-500/30 border-2 border-amber-400">
+                  XF
+                </div>
                 <div>
                   <h2 className="text-xl font-black text-slate-900 tracking-tight">XLLENT FOODS</h2>
                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Distribution Management System</p>
@@ -401,7 +396,7 @@ export default function AdminOrdersPage() {
               <div className="text-right">
                 <p className="font-mono text-xs font-bold text-slate-800">Tax Invoice #XFP-INV-{invoiceOrder.id}</p>
                 <p className="text-[11px] text-slate-500">{new Date(invoiceOrder.created_at).toLocaleDateString()}</p>
-                <span className="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase rounded-md">GST Verified</span>
+                <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase rounded-md">GST Tax Invoice</span>
               </div>
             </div>
 
@@ -415,10 +410,11 @@ export default function AdminOrdersPage() {
               <div>
                 <span className="text-slate-400 block font-bold uppercase text-[10px]">Fulfilled By (Upline):</span>
                 <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.seller_name || 'Xllent Foods Central Hub'}</p>
+                <p className="text-slate-600 text-[11px]">Authorized Distribution Network</p>
               </div>
             </div>
 
-            {/* Invoice Summary */}
+            {/* Invoice Summary Table */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead>
@@ -429,21 +425,21 @@ export default function AdminOrdersPage() {
                 </thead>
                 <tbody>
                   <tr className="border-t border-slate-100">
-                    <td className="p-3 font-bold text-slate-800">{invoiceOrder.status}</td>
+                    <td className="p-3 font-bold text-slate-800 uppercase">{invoiceOrder.status}</td>
                     <td className="p-3 text-right font-black text-slate-900 text-sm">₹{invoiceOrder.total_amount}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* Footer / Print Button */}
+            {/* Footer Actions / Download PDF */}
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
               <span className="text-xs text-slate-500 font-medium">Thank you for your business partnership with Xllent Foods!</span>
               <button 
                 onClick={() => window.print()} 
-                className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer"
+                className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center gap-2"
               >
-                Download / Print PDF Invoice
+                <FileText className="w-4 h-4" /> Download / Print PDF Invoice
               </button>
             </div>
           </div>
