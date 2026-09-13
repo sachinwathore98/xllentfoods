@@ -176,12 +176,37 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     if (!invoiceOrder) return;
     try {
       setIsDownloading(true);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
+      // Helper to load image as base64
+      const getBase64Image = (url: string): Promise<string> => {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.crossOrigin = 'Anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0);
+            resolve(canvas.toDataURL('image/png'));
+          };
+          img.onerror = (error) => reject(error);
+          img.src = url;
+        });
+      };
+
+      let logoBase64 = '';
+      try {
+        logoBase64 = await getBase64Image('/images/logo.png');
+      } catch (e) {
+        console.warn('Could not load logo image for PDF, continuing without logo:', e);
+      }
+
       // Top Decorative Accent Bar
       pdf.setFillColor(217, 119, 6); // Amber-600
       pdf.rect(0, 0, 210, 4, 'F');
@@ -190,20 +215,27 @@ export default function AdminOrdersPage() {
       pdf.setFillColor(15, 23, 42); // Slate-900
       pdf.rect(0, 4, 210, 36, 'F');
 
+      // Draw Logo if loaded successfully
+      let textXOffset = 18;
+      if (logoBase64) {
+        pdf.addImage(logoBase64, 'PNG', 15, 9, 24, 24);
+        textXOffset = 44; // Shift text right if logo is present
+      }
+
       // Header Brand Text
       pdf.setTextColor(255, 255, 255);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(20);
-      pdf.text('XLLENT FOODS', 18, 19);
+      pdf.text('XLLENT FOODS', textXOffset, 19);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(217, 119, 6); // Amber-600
-      pdf.text('DISTRIBUTION MANAGEMENT SYSTEM', 18, 25);
+      pdf.text('DISTRIBUTION MANAGEMENT SYSTEM', textXOffset, 25);
 
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184); // Slate-400
-      pdf.text('Official Tax Invoice & Fulfillment Receipt', 18, 30);
+      pdf.text('Official Tax Invoice & Fulfillment Receipt', textXOffset, 30);
 
       // Invoice Meta (Right Aligned in Header)
       pdf.setFont('helvetica', 'bold');
