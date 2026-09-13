@@ -10,6 +10,7 @@ interface UserProfile {
   role: string;
   phone?: string;
   location?: string;
+  gst_number?: string;
 }
 
 export default function CreateAndManageUsersPage() {
@@ -20,6 +21,7 @@ export default function CreateAndManageUsersPage() {
   const [role, setRole] = useState('shop');
   const [phone, setPhone] = useState('');
   const [location, setLocation] = useState('');
+  const [gstNumber, setGstNumber] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [parentId, setParentId] = useState<string>('');
@@ -35,6 +37,7 @@ export default function CreateAndManageUsersPage() {
   const [editEmail, setEditEmail] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editLocation, setEditLocation] = useState('');
+  const [editGstNumber, setEditGstNumber] = useState('');
   const [editPassword, setEditPassword] = useState('');
 
   useEffect(() => {
@@ -67,7 +70,6 @@ export default function CreateAndManageUsersPage() {
 
   const getFilteredParents = () => {
     if (role === 'admin') {
-      // Admins can have superadmin or no parent
       return parentsList.filter(p => p.role === 'superadmin');
     }
     if (role === 'super_stockist') {
@@ -121,6 +123,7 @@ export default function CreateAndManageUsersPage() {
         role,
         phone,
         location: role === 'shop' ? location : null,
+        gstNumber,
         latitude: role === 'shop' ? latitude : null,
         longitude: role === 'shop' ? longitude : null,
         parentId: parentId ? Number(parentId) : null
@@ -131,6 +134,7 @@ export default function CreateAndManageUsersPage() {
       setEmail('');
       setPhone('');
       setLocation('');
+      setGstNumber('');
       setLatitude(null);
       setLongitude(null);
       setParentId('');
@@ -153,6 +157,7 @@ export default function CreateAndManageUsersPage() {
     setEditEmail(user.email);
     setEditPhone(user.phone || '');
     setEditLocation(user.location || '');
+    setEditGstNumber(user.gst_number || '');
     setEditPassword('');
   };
 
@@ -166,6 +171,7 @@ export default function CreateAndManageUsersPage() {
         email: editEmail,
         phone: editPhone,
         location: editLocation,
+        gstNumber: editGstNumber,
         password: editPassword
       });
       setMessage('User profile updated successfully!');
@@ -284,21 +290,32 @@ export default function CreateAndManageUsersPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Assign Parent Uplink {role === 'admin' ? '(Optional for Top-Level Admin)' : `(Required for ${role.replace('_', ' ')})`}
-              </label>
-              <select
-                value={parentId}
-                onChange={(e) => setParentId(e.target.value)}
-                required={role !== 'admin'}
-                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium"
-              >
-                <option value="">{role === 'admin' ? '-- No Parent (Top-Level System Admin) --' : '-- Select Authorized Parent Uplink --'}</option>
-                {filteredParents.map(p => (
-                  <option key={p.id} value={p.id}>{p.name} ({p.role.replace('_', ' ').toUpperCase()})</option>
-                ))}
-              </select>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">GST Number (Optional for Tax Invoicing)</label>
+              <input
+                type="text"
+                value={gstNumber}
+                onChange={(e) => setGstNumber(e.target.value)}
+                placeholder="e.g. 27AAAAA0000A1Z5"
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-amber-500"
+              />
             </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Assign Parent Uplink {role === 'admin' ? '(Optional for Top-Level Admin)' : `(Required for ${role.replace('_', ' ')})`}
+            </label>
+            <select
+              value={parentId}
+              onChange={(e) => setParentId(e.target.value)}
+              required={role !== 'admin'}
+              className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white font-medium"
+            >
+              <option value="">{role === 'admin' ? '-- No Parent (Top-Level System Admin) --' : '-- Select Authorized Parent Uplink --'}</option>
+              {filteredParents.map(p => (
+                <option key={p.id} value={p.id}>{p.name} ({p.role.replace('_', ' ').toUpperCase()})</option>
+              ))}
+            </select>
           </div>
 
           {role === 'shop' && (
@@ -364,6 +381,7 @@ export default function CreateAndManageUsersPage() {
                   <div className="space-y-1 pt-2 text-xs text-slate-500">
                     <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-slate-400" /> {u.email}</p>
                     {u.phone && <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /> {u.phone}</p>}
+                    {u.gst_number && <p className="font-mono text-[11px] text-amber-700 font-bold">GSTIN: {u.gst_number}</p>}
                     {u.location && <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {u.location}</p>}
                   </div>
                 </div>
@@ -409,6 +427,10 @@ export default function CreateAndManageUsersPage() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number</label>
                 <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">GST Number (Optional)</label>
+                <input type="text" value={editGstNumber} onChange={(e) => setEditGstNumber(e.target.value)} placeholder="e.g. 27AAAAA0000A1Z5" className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Location / Address</label>

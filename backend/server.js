@@ -55,6 +55,7 @@ async function initDatabase() {
         role VARCHAR(50) NOT NULL,
         phone VARCHAR(50),
         location VARCHAR(255),
+        gst_number VARCHAR(50),
         latitude NUMERIC(10, 8),
         longitude NUMERIC(11, 8),
         parent_id INT,
@@ -66,6 +67,7 @@ async function initDatabase() {
       ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'shop';
       ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS location VARCHAR(255);
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS gst_number VARCHAR(50);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS latitude NUMERIC(10, 8);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS longitude NUMERIC(11, 8);
       ALTER TABLE users ADD COLUMN IF NOT EXISTS parent_id INT;
@@ -414,7 +416,7 @@ app.delete('/api/admin/enquiries/:id', async (req, res) => {
 app.post('/api/orders/smart', async (req, res) => {
   try {
     const { buyerId, items, totalAmount, proxyForId } = req.body;
-    const actualBuyerId = buyerId; // Ensure the order is billed directly to the selected partner
+    const actualBuyerId = buyerId;
     const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [actualBuyerId]);
     if (buyerRes.rows.length === 0) return res.status(404).json({ message: 'Buyer not found' });
     const buyer = buyerRes.rows[0];
@@ -445,14 +447,13 @@ app.get('/api/orders', async (req, res) => {
     const { userId, role } = req.query;
     let query = `
       SELECT o.id, o.total_amount, o.status, o.created_at, 
-             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Partner') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role, COALESCE(b.location, '') as buyer_location, COALESCE(b.phone, '') as buyer_phone,
+             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Partner') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role, COALESCE(b.location, '') as buyer_location, COALESCE(b.phone, '') as buyer_phone, COALESCE(b.gst_number, '') as buyer_gst,
              COALESCE(s.id, 0) as seller_id, COALESCE(s.name, 'Direct Admin') as seller_name, COALESCE(s.role, 'admin') as seller_role
       FROM orders o
       LEFT JOIN users b ON o.buyer_id = b.id
       LEFT JOIN users s ON o.seller_id = s.id
     `;
     let params = [];
-    // If user is a regular partner, restrict to their orders. If admin/superadmin, show all orders.
     if (role && role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
       query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1`;
       params.push(userId);
@@ -480,7 +481,6 @@ app.get('/api/orders', async (req, res) => {
 });
 
 // Update Order, items, and status
-// --- UPDATE ORDER ROUTE ---
 app.put('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   const { items, totalAmount, status } = req.body;
@@ -514,6 +514,17 @@ app.put('/api/orders/:id', async (req, res) => {
   }
 });
 
+app.put('/api/orders/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+    res.json({ message: 'Order status updated successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update order status' });
+  }
+});
+
 app.delete('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -533,14 +544,14 @@ app.get('/api/admin/downline-users', async (req, res) => {
   try {
     const { userId, role } = req.query;
     if (role === 'admin' || role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
-      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
+      const result = await pool.query("SELECT id, name, email, role, phone, location, gst_number, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
       return res.json({ users: result.rows });
     }
     const result = await pool.query(`
       WITH RECURSIVE downline AS (
-        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1
+        SELECT id, name, email, role, phone, location, gst_number, parent_id FROM users WHERE parent_id = $1
         UNION
-        SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
+        SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.gst_number, u.parent_id FROM users u
         JOIN downline d ON u.parent_id = d.id
       )
       SELECT * FROM downline ORDER BY role, name ASC
@@ -551,16 +562,25 @@ app.get('/api/admin/downline-users', async (req, res) => {
   }
 });
 
+app.get('/api/admin/users-list', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT id, name, email, role, phone, location, gst_number FROM users ORDER BY name ASC");
+    res.json({ users: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch users list' });
+  }
+});
+
 app.post('/api/admin/users/create', async (req, res) => {
   try {
-    const { name, email, password, role, phone, location, parentId } = req.body;
+    const { name, email, password, role, phone, location, gstNumber, parentId } = req.body;
     const existing = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
     if (existing.rows.length > 0) return res.status(400).json({ message: 'User already exists.' });
 
     const hashedPassword = await bcrypt.hash(password || 'Admin@123', 10);
     const result = await pool.query(
-      `INSERT INTO users (name, email, password, role, phone, location, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, email, role`,
-      [name, email, hashedPassword, role, phone, location, parentId || null]
+      `INSERT INTO users (name, email, password, role, phone, location, gst_number, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, name, email, role, gst_number`,
+      [name, email, hashedPassword, role, phone, location, gstNumber || null, parentId || null]
     );
     res.status(201).json({ message: 'User provisioned successfully', user: result.rows[0] });
   } catch (err) {
@@ -571,14 +591,14 @@ app.post('/api/admin/users/create', async (req, res) => {
 app.put('/api/admin/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, location, password } = req.body;
+    const { name, email, phone, location, gstNumber, password } = req.body;
     if (password && password.trim() !== '') {
       const hashedPassword = await bcrypt.hash(password, 10);
-      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4, password = $5 WHERE id = $6 RETURNING id, name, email, role`, [name, email, phone, location, hashedPassword, id]);
+      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4, gst_number = $5, password = $6 WHERE id = $7 RETURNING id, name, email, role, gst_number`, [name, email, phone, location, gstNumber || null, hashedPassword, id]);
       if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
       return res.json({ message: 'User updated successfully', user: result.rows[0] });
     } else {
-      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4 WHERE id = $5 RETURNING id, name, email, role`, [name, email, phone, location, id]);
+      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4, gst_number = $5 WHERE id = $6 RETURNING id, name, email, role, gst_number`, [name, email, phone, location, gstNumber || null, id]);
       if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
       return res.json({ message: 'User updated successfully', user: result.rows[0] });
     }

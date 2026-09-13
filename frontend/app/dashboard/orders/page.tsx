@@ -335,7 +335,7 @@ export default function AdminOrdersPage() {
 
       pdf.setDrawColor(226, 232, 240);
       pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(15, 63, 180, 46, 3, 3, 'FD');
+      pdf.roundedRect(15, 63, 180, 52, 3, 3, 'FD');
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
@@ -353,8 +353,9 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(71, 85, 105);
       pdf.text(`Email: ${invoiceOrder.buyer_email || 'N/A'}`, 20, 85);
       pdf.text(`Phone: ${invoiceOrder.buyer_phone || 'N/A'}`, 20, 91);
-      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Partner').toUpperCase()}`, 20, 97);
-      pdf.text(`Territory / Location: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 103);
+      pdf.text(`GSTIN: ${invoiceOrder.buyer_gst || 'Unregistered / Consumer'}`, 20, 97);
+      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Partner').toUpperCase()}`, 20, 103);
+      pdf.text(`Territory / Location: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 109);
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
@@ -368,7 +369,7 @@ export default function AdminOrdersPage() {
       pdf.text(`Network Role: ${(invoiceOrder.seller_role || 'Admin').toUpperCase()}`, 110, 91);
       pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
 
-      let startY = 116;
+      let startY = 122;
       pdf.setFillColor(241, 245, 249);
       pdf.rect(15, startY, 180, 8, 'F');
       pdf.setFont('helvetica', 'bold');
@@ -541,6 +542,7 @@ export default function AdminOrdersPage() {
                       <p className="font-bold text-slate-900 text-sm">{o.buyer_name}</p>
                       <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
                         ({o.buyer_role?.toUpperCase()}) — <span className="text-slate-600 font-bold">{o.buyer_location || 'N/A'}</span>
+                        {o.buyer_gst && <span className="block text-amber-700 font-mono font-bold">GSTIN: {o.buyer_gst}</span>}
                       </span>
                     </td>
                     <td className="p-4 text-slate-700 font-bold">{o.seller_name || 'Direct Admin'}</td>
@@ -855,6 +857,7 @@ export default function AdminOrdersPage() {
               <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-xs">
                 <p><strong>Selected Partner / Vendor:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
                 <p><strong>Role & Location:</strong> {invoiceOrder.buyer_role?.toUpperCase()} — {invoiceOrder.buyer_location || 'N/A'}</p>
+                {invoiceOrder.buyer_gst && <p><strong>GSTIN:</strong> {invoiceOrder.buyer_gst}</p>}
                 <p><strong>Order Created At:</strong> {new Date(invoiceOrder.created_at).toLocaleString()}</p>
                 <p><strong>Status:</strong> <span className="text-amber-600 font-bold">{invoiceOrder.status}</span></p>
               </div>
