@@ -120,8 +120,11 @@ async function initDatabase() {
         role_type VARCHAR(100) NOT NULL,
         location VARCHAR(255) NOT NULL,
         message TEXT,
+        status VARCHAR(50) DEFAULT 'Pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+
+      ALTER TABLE partnership_enquiries ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending';
 
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
@@ -698,17 +701,22 @@ app.put('/api/admin/enquiries/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { fullName, email, phone, roleType, location, message, status } = req.body;
+    
     const result = await pool.query(
       `UPDATE partnership_enquiries 
        SET full_name = $1, email = $2, phone = $3, role_type = $4, location = $5, message = $6, status = $7 
        WHERE id = $8 RETURNING *`,
       [fullName, email, phone, roleType, location, message, status || 'Pending', id]
     );
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Enquiry not found' });
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Enquiry not found' });
+    }
+
     res.json({ message: 'Enquiry updated successfully', enquiry: result.rows[0] });
   } catch (err) {
     console.error('Update Enquiry Error:', err);
-    res.status(500).json({ message: 'Failed to update enquiry' });
+    res.status(500).json({ message: `Failed to update enquiry: ${err.message}` });
   }
 });
 
