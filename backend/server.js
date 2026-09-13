@@ -433,12 +433,22 @@ app.get('/api/downline-pricing/:userId', async (req, res) => {
 app.post('/api/downline-pricing/set-user-price', async (req, res) => {
   try {
     const { userId, productId, customPrice } = req.body;
-    await pool.query(`
-      INSERT INTO downline_pricing_overrides (user_id, product_id, custom_price)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (user_id, product_id)
-      DO UPDATE SET custom_price = EXCLUDED.custom_price
-    `, [userId, productId, customPrice]);
+    
+    // Try updating existing record first
+    const updateRes = await pool.query(`
+      UPDATE downline_pricing_overrides 
+      SET custom_price = $1 
+      WHERE user_id = $2 AND product_id = $3
+      RETURNING *
+    `, [customPrice, userId, productId]);
+
+    // If no existing record was found, insert a new one
+    if (updateRes.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO downline_pricing_overrides (user_id, product_id, custom_price)
+        VALUES ($1, $2, $3)
+      `, [userId, productId, customPrice]);
+    }
 
     res.json({ message: 'User-specific product pricing successfully updated' });
   } catch (err) {
