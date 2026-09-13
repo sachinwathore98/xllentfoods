@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package, Search, Calendar, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 export default function AdminOrdersPage() {
@@ -12,6 +12,10 @@ export default function AdminOrdersPage() {
   const [partnerPricing, setPartnerPricing] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Search & Filter States
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -368,6 +372,18 @@ export default function AdminOrdersPage() {
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
+  // Filter and Search Orders
+  const filteredOrders = orders.filter((o) => {
+    const matchesSearch = 
+      String(o.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (o.buyer_name && o.buyer_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (o.buyer_location && o.buyer_location.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesStatus = statusFilter === 'All' || (o.status && o.status.toLowerCase() === statusFilter.toLowerCase());
+    
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="w-full">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
@@ -385,21 +401,52 @@ export default function AdminOrdersPage() {
         </button>
       </div>
 
+      {/* Search and Status Filter Bar */}
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by Order ID (#9) or Partner Name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 transition"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto w-full md:w-auto pb-1 md:pb-0">
+          <Filter className="w-4 h-4 text-slate-400 shrink-0 mr-1" />
+          {['All', 'Pending', 'Processing', 'Dispatched', 'Completed', 'Approved', 'Cancelled'].map((status) => (
+            <button
+              key={status}
+              onClick={() => setStatusFilter(status)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition shrink-0 cursor-pointer ${
+                statusFilter === status 
+                  ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' 
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {status}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
           <div className="text-center py-20 text-slate-400 text-xs font-bold animate-pulse">Loading orders feed...</div>
-        ) : orders.length === 0 ? (
+        ) : filteredOrders.length === 0 ? (
           <div className="text-center py-24 space-y-3">
             <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto" />
-            <p className="text-slate-600 text-xs font-bold">No orders found for your account scope.</p>
-            <p className="text-slate-400 text-[11px]">Orders placed by your downline network will appear here automatically.</p>
+            <p className="text-slate-600 text-xs font-bold">No orders found matching your search or filter.</p>
+            <p className="text-slate-400 text-[11px]">Try searching with a different term or clear the status filter.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
-                  <th className="p-4">Order ID</th>
+                  <th className="p-4">Order ID & Date</th>
                   <th className="p-4">Partner / Vendor (Billed To)</th>
                   <th className="p-4">Seller / Upline</th>
                   <th className="p-4">Total Amount</th>
@@ -408,9 +455,14 @@ export default function AdminOrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
-                {orders.map((o) => (
+                {filteredOrders.map((o) => (
                   <tr key={o.id} className="hover:bg-slate-50/80 transition">
-                    <td className="p-4 font-mono font-bold text-amber-600">#XFP-{o.id}</td>
+                    <td className="p-4">
+                      <span className="font-mono font-bold text-amber-600 block">#XFP-{o.id}</span>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                        <Calendar className="w-3 h-3" /> {new Date(o.created_at).toLocaleString()}
+                      </span>
+                    </td>
                     <td className="p-4 font-bold text-slate-900">
                       {o.buyer_name} 
                       <span className="text-[10px] text-slate-400 block font-normal">
@@ -610,6 +662,7 @@ export default function AdminOrdersPage() {
               <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-xs">
                 <p><strong>Selected Partner / Vendor:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
                 <p><strong>Role & Location:</strong> {invoiceOrder.buyer_role?.toUpperCase()} — {invoiceOrder.buyer_location || 'N/A'}</p>
+                <p><strong>Order Created At:</strong> {new Date(invoiceOrder.created_at).toLocaleString()}</p>
                 <p><strong>Status:</strong> <span className="text-amber-600 font-bold">{invoiceOrder.status}</span></p>
               </div>
             </div>
