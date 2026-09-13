@@ -414,32 +414,12 @@ app.delete('/api/admin/enquiries/:id', async (req, res) => {
 app.post('/api/orders/smart', async (req, res) => {
   try {
     const { buyerId, items, totalAmount, proxyForId } = req.body;
-    const actualBuyerId = proxyForId || buyerId;
+    const actualBuyerId = buyerId; // Ensure the order is billed directly to the selected partner
     const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [actualBuyerId]);
     if (buyerRes.rows.length === 0) return res.status(404).json({ message: 'Buyer not found' });
     const buyer = buyerRes.rows[0];
 
-    let targetSellerId = buyer.parent_id || null;
-    if (!targetSellerId) {
-      if (buyer.role === 'shop') {
-        const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
-        else {
-          const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
-          if (distQuery.rows.length > 0) targetSellerId = distQuery.rows[0].id;
-        }
-      } else if (buyer.role === 'distributor') {
-        const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
-        else {
-          const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
-          if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
-        }
-      } else if (buyer.role === 'super_stockist') {
-        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
-        if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
-      }
-    }
+    let targetSellerId = proxyForId || buyer.parent_id || null;
 
     const orderResult = await pool.query(
       "INSERT INTO orders (buyer_id, seller_id, total_amount, status) VALUES ($1, $2, $3, $4) RETURNING id",
@@ -509,14 +489,10 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-// Delete Order and its associated items using `pool` instead of undefined `supabase` client
 app.delete('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // First delete dependent order items using pool
     await pool.query('DELETE FROM order_items WHERE order_id = $1', [id]);
-    
-    // Then delete the order itself
     const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING *', [id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'Order not found' });
     
@@ -616,7 +592,7 @@ app.post('/api/admin/advertisements', async (req, res) => {
     );
     res.status(201).json({ message: 'Advertisement added successfully', advertisement: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to delete advertisement' });
+    res.status(500).json({ message: 'Failed to add advertisement' });
   }
 });
 
