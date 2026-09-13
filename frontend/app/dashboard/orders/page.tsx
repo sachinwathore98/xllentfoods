@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X, Trash2, Edit3, Download, Package } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
@@ -22,7 +22,6 @@ export default function AdminOrdersPage() {
   
   // Invoice & Edit States
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
-  const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
@@ -182,8 +181,11 @@ export default function AdminOrdersPage() {
     if (!input) return;
     try {
       setIsDownloading(true);
-      // Fixed code:
-const canvas = await html2canvas(input, { scale: 2, useCORS: true } as any);
+      const canvas = await html2canvas(input, { 
+        scale: 2, 
+        useCORS: true,
+        backgroundColor: '#ffffff'
+      } as any);
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
