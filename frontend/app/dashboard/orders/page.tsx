@@ -1,22 +1,22 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Package, Trash2 } from 'lucide-react';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [downlineUsers, setDownlineUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState('');
-  const [orderItems, setOrderItems] = useState<{ productId: number; quantity: number; unitPrice: number }[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState('');
-  const [quantity, setQuantity] = useState(1);
-
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; category: string; quantity: number; unitPrice: number }[]>([]);
+  
   // Invoice Modal State
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
 
@@ -29,6 +29,7 @@ export default function AdminOrdersPage() {
       fetchDownlineUsers(u.id, u.role);
     }
     fetchProducts();
+    fetchCategories();
   }, []);
 
   const fetchOrders = async (userId: string, role: string) => {
@@ -61,23 +62,38 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleAddItem = () => {
-    if (!selectedProductId || quantity <= 0) return;
-    const prod = products.find((p) => p.id === Number(selectedProductId));
-    if (!prod) return;
+  const fetchCategories = async () => {
+    try {
+      const res = await API.get('/api/categories');
+      setCategories(res.data.categories || []);
+    } catch (err) {
+      console.error('Failed to fetch categories', err);
+    }
+  };
 
-    setOrderItems((prev) => [
-      ...prev,
-      { productId: prod.id, quantity: Number(quantity), unitPrice: Number(prod.mrp) }
-    ]);
-    setSelectedProductId('');
-    setQuantity(1);
+  const handleQuantityChange = (productId: number, qty: number, mrp: number, name: string, category: string) => {
+    const quantity = Math.max(0, qty);
+    setOrderItems((prev) => {
+      const existing = prev.find((item) => item.productId === productId);
+      if (quantity === 0) {
+        return prev.filter((item) => item.productId !== productId);
+      }
+      if (existing) {
+        return prev.map((item) => item.productId === productId ? { ...item, quantity } : item);
+      } else {
+        return [...prev, { productId, name, category, quantity, unitPrice: Number(mrp) }];
+      }
+    });
+  };
+
+  const handleRemoveItem = (productId: number) => {
+    setOrderItems((prev) => prev.filter((item) => item.productId !== productId));
   };
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBuyerId || orderItems.length === 0) {
-      alert('Please select a downstream user and add at least one product.');
+      alert('Please select a downstream user and add at least one product item with quantity.');
       return;
     }
 
@@ -110,35 +126,43 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const filteredProducts = selectedCategory === 'All' 
+    ? products 
+    : products.filter(p => p.category === selectedCategory);
+
   return (
     <div className="w-full">
-      <div className="flex justify-between items-center mb-8">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-white tracking-tight">Orders & Downstream Feed</h1>
-          <p className="text-xs text-slate-400 mt-1">Portal Role: <span className="text-amber-400 font-bold uppercase">{currentUser?.role}</span>. Manage orders and create direct downstream rate sheets.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders & Downstream Feed</h1>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            Portal Role: <span className="text-amber-600 font-extrabold uppercase">{currentUser?.role}</span>. Manage fulfillment requests and dispatch downstream invoices.
+          </p>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer"
+          className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer"
         >
           <Plus className="w-4 h-4" /> Create Order for Downstream
         </button>
       </div>
 
       {/* Orders Table Feed */}
-      <div className="bg-slate-950 rounded-2xl border border-slate-800 shadow-xl overflow-hidden">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="text-center py-20 text-slate-500 text-xs font-bold animate-pulse">Loading orders feed...</div>
+          <div className="text-center py-20 text-slate-400 text-xs font-bold animate-pulse">Loading orders feed...</div>
         ) : orders.length === 0 ? (
           <div className="text-center py-24 space-y-3">
-            <ShoppingCart className="w-12 h-12 text-slate-700 mx-auto" />
-            <p className="text-slate-400 text-xs font-bold">No orders found for your account scope.</p>
+            <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto" />
+            <p className="text-slate-600 text-xs font-bold">No orders found for your account scope.</p>
+            <p className="text-slate-400 text-[11px]">Orders placed by your downline network will appear here automatically.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-900 text-slate-400 uppercase font-black text-[10px] tracking-wider border-b border-slate-800">
+                <tr className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
                   <th className="p-4">Order ID</th>
                   <th className="p-4">Buyer (Downstream)</th>
                   <th className="p-4">Seller / Upline</th>
@@ -147,16 +171,16 @@ export default function AdminOrdersPage() {
                   <th className="p-4 text-right">Actions / Invoice</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-900 font-medium">
+              <tbody className="divide-y divide-slate-100 font-medium">
                 {orders.map((o) => (
-                  <tr key={o.id} className="hover:bg-slate-900/50 transition">
-                    <td className="p-4 font-mono font-bold text-amber-400">#XFP-{o.id}</td>
-                    <td className="p-4 font-bold text-white">{o.buyer_name} <span className="text-[10px] text-slate-400 block">({o.buyer_role})</span></td>
-                    <td className="p-4 text-slate-300">{o.seller_name || 'Direct Admin'}</td>
-                    <td className="p-4 font-black text-white">₹{o.total_amount}</td>
+                  <tr key={o.id} className="hover:bg-slate-50/80 transition">
+                    <td className="p-4 font-mono font-bold text-amber-600">#XFP-{o.id}</td>
+                    <td className="p-4 font-bold text-slate-900">{o.buyer_name} <span className="text-[10px] text-slate-400 block">({o.buyer_role})</span></td>
+                    <td className="p-4 text-slate-600">{o.seller_name || 'Direct Admin'}</td>
+                    <td className="p-4 font-black text-slate-900">₹{o.total_amount}</td>
                     <td className="p-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                        o.status === 'Completed' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                        o.status === 'Completed' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
                       }`}>
                         {o.status || 'Pending'}
                       </span>
@@ -164,14 +188,14 @@ export default function AdminOrdersPage() {
                     <td className="p-4 text-right space-x-2">
                       <button
                         onClick={() => setInvoiceOrder(o)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 font-extrabold rounded-lg inline-flex items-center gap-1 transition cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-xl inline-flex items-center gap-1 transition cursor-pointer"
                       >
-                        <FileText className="w-3.5 h-3.5" /> Invoice
+                        <FileText className="w-3.5 h-3.5 text-amber-600" /> Invoice
                       </button>
                       <select
                         value={o.status || 'Pending'}
                         onChange={(e) => updateOrderStatus(o.id, e.target.value)}
-                        className="bg-slate-900 border border-slate-700 text-slate-300 text-[11px] rounded-lg px-2 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer"
+                        className="bg-white border border-slate-200 text-slate-700 text-[11px] rounded-xl px-2 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Processing">Processing</option>
@@ -188,72 +212,118 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Create Order Modal */}
+      {/* Create Order Modal with Category & Full Product Catalog Picker */}
       {isCreateModalOpen && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-lg p-6 space-y-6 shadow-2xl">
-            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
-              <h3 className="text-base font-black text-white">Create Order for Downstream User</h3>
-              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-white"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">Create Order for Downstream Partner</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Select partner account and assign required quantities from catalog.</p>
+              </div>
+              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             </div>
 
-            <form onSubmit={handleCreateOrder} className="space-y-4">
+            <form onSubmit={handleCreateOrder} className="space-y-6">
+              {/* Partner Select */}
               <div>
-                <label className="block text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Select Downline Partner</label>
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Select Downstream Partner Account</label>
                 <select
                   value={selectedBuyerId}
                   onChange={(e) => setSelectedBuyerId(e.target.value)}
                   required
-                  className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
                 >
-                  <option value="">-- Choose Downstream User --</option>
+                  <option value="">-- Choose Downstream Partner --</option>
                   {downlineUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role.toUpperCase()}) - {u.location || 'N/A'}</option>
+                    <option key={u.id} value={u.id}>{u.name} ({u.role.toUpperCase()}) — {u.location || 'N/A'}</option>
                   ))}
                 </select>
               </div>
 
-              <div className="bg-slate-950 p-4 rounded-2xl border border-slate-800 space-y-3">
-                <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider block">Add Products to Order</span>
-                <div className="flex gap-2">
-                  <select
-                    value={selectedProductId}
-                    onChange={(e) => setSelectedProductId(e.target.value)}
-                    className="flex-1 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+              {/* Category Filter Tabs */}
+              <div className="space-y-3">
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory('All')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      selectedCategory === 'All' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                   >
-                    <option value="">-- Select Product --</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} (MRP: ₹{p.mrp})</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
-                    className="w-20 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white text-center focus:outline-none focus:border-amber-500"
-                  />
-                  <button type="button" onClick={handleAddItem} className="px-4 py-2 bg-amber-500 text-slate-950 font-black rounded-xl text-xs hover:bg-amber-600 transition">Add</button>
+                    All Products
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setSelectedCategory(cat.name)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        selectedCategory === cat.name ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
                 </div>
 
-                {orderItems.length > 0 && (
-                  <div className="mt-3 space-y-1.5 max-h-36 overflow-y-auto">
-                    {orderItems.map((item, idx) => {
-                      const prod = products.find((p) => p.id === item.productId);
+                {/* Product Selection Grid */}
+                <div className="border border-slate-200 rounded-2xl max-h-64 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3">
+                  {filteredProducts.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400 font-medium">No products found in this category.</div>
+                  ) : (
+                    filteredProducts.map((p) => {
+                      const currentItem = orderItems.find(i => i.productId === p.id);
+                      const qty = currentItem ? currentItem.quantity : 0;
                       return (
-                        <div key={idx} className="flex justify-between items-center text-xs bg-slate-900 p-2 rounded-xl border border-slate-800">
-                          <span className="text-white font-bold">{prod?.name || 'Product'}</span>
-                          <span className="text-slate-400">Qty: {item.quantity} × ₹{item.unitPrice}</span>
+                        <div key={p.id} className="flex items-center justify-between py-2.5 px-3 hover:bg-white rounded-xl transition">
+                          <div>
+                            <p className="text-xs font-black text-slate-900">{p.name}</p>
+                            <p className="text-[10px] text-slate-500">SKU: {p.sku} | MRP: <span className="font-bold text-slate-800">₹{p.mrp}</span> | <span className="text-amber-600 font-bold">{p.category}</span></p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Qty:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => handleQuantityChange(p.id, Number(e.target.value), p.mrp, p.name, p.category)}
+                              className="w-16 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
+                            />
+                          </div>
                         </div>
                       );
-                    })}
-                  </div>
-                )}
+                    })
+                  )}
+                </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-4 py-2.5 bg-slate-800 text-slate-300 font-bold rounded-xl text-xs">Cancel</button>
-                <button type="submit" className="px-5 py-2.5 bg-amber-500 text-slate-950 font-black rounded-xl text-xs hover:bg-amber-600 shadow-lg shadow-amber-500/20">Submit Order</button>
+              {/* Selected Order Summary Review */}
+              {orderItems.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-amber-900 uppercase tracking-wider">Order Items Summary ({orderItems.length})</span>
+                    <span className="text-xs font-black text-amber-900">Total: ₹{orderItems.reduce((acc, i) => acc + (i.quantity * i.unitPrice), 0)}</span>
+                  </div>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {orderItems.map((item) => (
+                      <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2 rounded-xl border border-amber-100 shadow-sm">
+                        <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.category})</span></span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} = <strong className="text-slate-900">₹{item.quantity * item.unitPrice}</strong></span>
+                          <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
+                <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
+                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Confirm & Place Order</button>
               </div>
             </form>
           </div>
@@ -262,9 +332,9 @@ export default function AdminOrdersPage() {
 
       {/* Invoice Modal / Bill Generator */}
       {invoiceOrder && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-3xl w-full max-w-xl p-8 space-y-6 shadow-2xl relative">
-            <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white text-slate-900 rounded-3xl w-full max-w-xl p-8 space-y-6 shadow-2xl relative border border-slate-200">
+            <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             
             <div className="flex justify-between items-start border-b border-slate-200 pb-4">
               <div>
@@ -272,7 +342,7 @@ export default function AdminOrdersPage() {
                 <p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold">Distribution Tax Invoice</p>
               </div>
               <div className="text-right">
-                <p className="font-mono text-xs font-bold">Invoice #XFP-INV-{invoiceOrder.id}</p>
+                <p className="font-mono text-xs font-bold text-slate-800">Invoice #XFP-INV-{invoiceOrder.id}</p>
                 <p className="text-[11px] text-slate-500">{new Date(invoiceOrder.created_at).toLocaleDateString()}</p>
               </div>
             </div>
@@ -293,7 +363,7 @@ export default function AdminOrdersPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-wider">
-                    <th className="p-3">Status</th>
+                    <th className="p-3">Order Status</th>
                     <th className="p-3 text-right">Total Amount</th>
                   </tr>
                 </thead>
@@ -308,7 +378,7 @@ export default function AdminOrdersPage() {
 
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
               <span className="text-xs text-slate-500 font-medium">Thank you for your business partnership!</span>
-              <button onClick={() => window.print()} className="px-5 py-2.5 bg-amber-600 text-white font-black rounded-xl text-xs shadow hover:bg-amber-700 transition">Print Invoice</button>
+              <button onClick={() => window.print()} className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs shadow hover:shadow-md transition cursor-pointer">Print Invoice</button>
             </div>
           </div>
         </div>
