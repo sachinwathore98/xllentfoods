@@ -434,7 +434,10 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
   try {
     const { userId, productId, customPrice } = req.body;
     
-    // Try updating existing record first
+    if (!userId || !productId || customPrice === undefined) {
+      return res.status(400).json({ message: 'Missing required fields: userId, productId, or customPrice' });
+    }
+
     const updateRes = await pool.query(`
       UPDATE downline_pricing_overrides 
       SET custom_price = $1 
@@ -442,7 +445,6 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
       RETURNING *
     `, [customPrice, userId, productId]);
 
-    // If no existing record was found, insert a new one
     if (updateRes.rows.length === 0) {
       await pool.query(`
         INSERT INTO downline_pricing_overrides (user_id, product_id, custom_price)
@@ -452,8 +454,8 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
 
     res.json({ message: 'User-specific product pricing successfully updated' });
   } catch (err) {
-    console.error('User Pricing Override Error:', err);
-    res.status(500).json({ message: 'Failed to update user pricing override' });
+    console.error('User Pricing Override Error Details:', err);
+    res.status(500).json({ message: `Failed to update pricing: ${err.message}` });
   }
 });
 
