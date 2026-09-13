@@ -480,6 +480,7 @@ app.get('/api/orders', async (req, res) => {
 });
 
 // Update Order, items, and status
+// --- UPDATE ORDER ROUTE ---
 app.put('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   const { items, totalAmount, status } = req.body;
@@ -494,17 +495,22 @@ app.put('/api/orders/:id', async (req, res) => {
     if (items && Array.isArray(items)) {
       await pool.query("DELETE FROM order_items WHERE order_id = $1", [id]);
       for (let item of items) {
-        await pool.query(
-          "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
-          [id, item.productId || item.product_id, item.quantity, item.unitPrice || item.unit_price]
-        );
+        const prodId = item.productId || item.product_id;
+        const qty = item.quantity;
+        const price = item.unitPrice || item.unit_price;
+        if (prodId && qty) {
+          await pool.query(
+            "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+            [id, prodId, qty, price || 0]
+          );
+        }
       }
     }
 
     res.json({ success: true, message: 'Order successfully updated' });
   } catch (err) {
     console.error('Update Order Error:', err);
-    res.status(500).json({ error: 'Failed to update order in database' });
+    res.status(500).json({ error: `Failed to update order in database: ${err.message}` });
   }
 });
 

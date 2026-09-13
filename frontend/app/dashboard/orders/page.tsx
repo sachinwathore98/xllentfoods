@@ -1,7 +1,7 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package, Search, Calendar, Edit3 } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package, Search, Calendar, Edit3, Filter } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 export default function AdminOrdersPage() {
@@ -175,7 +175,6 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Open Edit Order Modal & Load Pricing for that specific buyer
   const openEditModal = async (order: any) => {
     setEditingOrder(order);
     setEditStatus(order.status || 'Pending');
@@ -189,7 +188,6 @@ export default function AdminOrdersPage() {
       gstPercent: i.gst_percent || i.gstPercent || 0
     })) : []);
 
-    // Fetch pricing for this order's buyer
     if (order.buyer_id) {
       try {
         const res = await API.get(`/api/downline-pricing/${order.buyer_id}`);
@@ -293,11 +291,9 @@ export default function AdminOrdersPage() {
         console.warn('Could not load logo image for PDF:', e);
       }
 
-      // Top Accent Bar
       pdf.setFillColor(217, 119, 6);
       pdf.rect(0, 0, 210, 4, 'F');
 
-      // Header Background
       pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 4, 210, 36, 'F');
 
@@ -321,7 +317,6 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(148, 163, 184);
       pdf.text('Official Tax Invoice & Partner Billing Statement', textXOffset, 30);
 
-      // Invoice Meta
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
       pdf.setTextColor(255, 255, 255);
@@ -331,7 +326,6 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(210, 215, 225);
       pdf.text(`Date: ${new Date(invoiceOrder.created_at).toLocaleDateString()}`, 192, 25, { align: 'right' });
 
-      // GSTIN Banner
       pdf.setFillColor(254, 243, 199);
       pdf.rect(15, 48, 180, 10, 'F');
       pdf.setFont('helvetica', 'bold');
@@ -339,7 +333,6 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(180, 83, 9);
       pdf.text('GSTIN: 27AABCX1234F1Z5', 20, 54.5);
 
-      // Selected Vendor & Upline Details Box
       pdf.setDrawColor(226, 232, 240);
       pdf.setFillColor(248, 250, 252);
       pdf.roundedRect(15, 63, 180, 46, 3, 3, 'FD');
@@ -350,7 +343,6 @@ export default function AdminOrdersPage() {
       pdf.text('BILLED TO (SELECTED PARTNER / VENDOR)', 20, 71);
       pdf.text('FULFILLED BY (UPLINE HUB)', 110, 71);
 
-      // Selected Partner Details
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
@@ -364,7 +356,6 @@ export default function AdminOrdersPage() {
       pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Partner').toUpperCase()}`, 20, 97);
       pdf.text(`Territory / Location: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 103);
 
-      // Seller Details
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
@@ -377,7 +368,6 @@ export default function AdminOrdersPage() {
       pdf.text(`Network Role: ${(invoiceOrder.seller_role || 'Admin').toUpperCase()}`, 110, 91);
       pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
 
-      // Itemized Table Header
       let startY = 116;
       pdf.setFillColor(241, 245, 249);
       pdf.rect(15, startY, 180, 8, 'F');
@@ -390,7 +380,6 @@ export default function AdminOrdersPage() {
       pdf.text('GST%', 160, startY + 5.5, { align: 'right' });
       pdf.text('TOTAL', 190, startY + 5.5, { align: 'right' });
 
-      // Itemized Data Rows
       startY += 12;
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8.5);
@@ -415,12 +404,10 @@ export default function AdminOrdersPage() {
       });
 
       startY += (itemsList.length * 9) + 6;
-      // Divider Line
       pdf.setDrawColor(226, 232, 240);
       pdf.line(15, startY, 195, startY);
 
       startY += 10;
-      // Grand Total Summary Box
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
       pdf.setTextColor(15, 23, 42);
@@ -428,13 +415,11 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(217, 119, 6);
       pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, startY, { align: 'right' });
 
-      // Terms & Conditions
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184);
       pdf.text('Terms & Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.', 15, 245);
 
-      // Footer
       pdf.setFillColor(248, 250, 252);
       pdf.rect(0, 280, 210, 17, 'F');
       pdf.setFont('helvetica', 'italic');
@@ -459,7 +444,6 @@ export default function AdminOrdersPage() {
     ? products
     : products.filter(p => p.category === editCategory);
 
-  // Filter and Search Orders
   const filteredOrders = orders.filter((o) => {
     const matchesSearch = 
       String(o.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -472,8 +456,9 @@ export default function AdminOrdersPage() {
   });
 
   return (
-    <div className="w-full">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+    <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders & Downstream Feed</h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
@@ -482,31 +467,32 @@ export default function AdminOrdersPage() {
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
-          className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer"
+          className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer shrink-0"
         >
           <Plus className="w-4 h-4" /> Create Order for Partner
         </button>
       </div>
 
       {/* Search and Dropdown Status Filter Bar */}
-      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm mb-6 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative w-full md:w-96">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+          <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder="Search by Order ID (#9) or Partner Name..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 transition"
+            className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500 transition shadow-inner"
           />
         </div>
 
         <div className="flex items-center gap-3 w-full md:w-auto">
+          <Filter className="w-4 h-4 text-slate-400 shrink-0" />
           <span className="text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">Filter Status:</span>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-2xl px-4 py-2.5 focus:outline-none focus:border-amber-500 transition cursor-pointer w-full md:w-48 shadow-sm"
+            className="bg-slate-50 border border-slate-200 text-slate-900 font-bold text-xs rounded-2xl px-4 py-3 focus:outline-none focus:border-amber-500 transition cursor-pointer w-full md:w-48 shadow-sm"
           >
             <option value="All">All Statuses</option>
             <option value="Pending">Pending</option>
@@ -519,7 +505,8 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      {/* Orders Table Feed */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         {loading ? (
           <div className="text-center py-20 text-slate-400 text-xs font-bold animate-pulse">Loading orders feed...</div>
         ) : filteredOrders.length === 0 ? (
@@ -532,49 +519,49 @@ export default function AdminOrdersPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
-                  <th className="p-4">Order ID & Date</th>
+                <tr className="bg-slate-50/80 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
+                  <th className="p-4 pl-6">Order ID & Date</th>
                   <th className="p-4">Partner / Vendor (Billed To)</th>
                   <th className="p-4">Seller / Upline</th>
                   <th className="p-4">Total Amount</th>
                   <th className="p-4">Status</th>
-                  <th className="p-4 text-right">Actions / Invoice</th>
+                  <th className="p-4 pr-6 text-right">Actions / Invoice</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {filteredOrders.map((o) => (
-                  <tr key={o.id} className="hover:bg-slate-50/80 transition">
-                    <td className="p-4">
-                      <span className="font-mono font-bold text-amber-600 block">#XFP-{o.id}</span>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
-                        <Calendar className="w-3 h-3" /> {new Date(o.created_at).toLocaleString()}
+                  <tr key={o.id} className="hover:bg-slate-50/60 transition">
+                    <td className="p-4 pl-6">
+                      <span className="font-mono font-black text-amber-600 text-sm block">#XFP-{o.id}</span>
+                      <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-1 font-semibold">
+                        <Calendar className="w-3 h-3 text-slate-400" /> {new Date(o.created_at).toLocaleString()}
                       </span>
                     </td>
-                    <td className="p-4 font-bold text-slate-900">
-                      {o.buyer_name} 
-                      <span className="text-[10px] text-slate-400 block font-normal">
-                        ({o.buyer_role?.toUpperCase()}) — {o.buyer_location || 'N/A'}
+                    <td className="p-4">
+                      <p className="font-bold text-slate-900 text-sm">{o.buyer_name}</p>
+                      <span className="text-[10px] text-slate-500 font-medium block mt-0.5">
+                        ({o.buyer_role?.toUpperCase()}) — <span className="text-slate-600 font-bold">{o.buyer_location || 'N/A'}</span>
                       </span>
                     </td>
-                    <td className="p-4 text-slate-600">{o.seller_name || 'Direct Admin'}</td>
-                    <td className="p-4 font-black text-slate-900">₹{o.total_amount}</td>
+                    <td className="p-4 text-slate-700 font-bold">{o.seller_name || 'Direct Admin'}</td>
+                    <td className="p-4 font-black text-slate-900 text-sm">₹{o.total_amount}</td>
                     <td className="p-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-block ${
                         o.status === 'Completed' || o.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
                       }`}>
                         {o.status || 'Pending'}
                       </span>
                     </td>
-                    <td className="p-4 text-right space-x-2">
+                    <td className="p-4 pr-6 text-right space-x-2 whitespace-nowrap">
                       <button
                         onClick={() => setInvoiceOrder(o)}
-                        className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-xl inline-flex items-center gap-1 transition cursor-pointer"
+                        className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-xl inline-flex items-center gap-1.5 transition cursor-pointer shadow-sm"
                       >
                         <FileText className="w-3.5 h-3.5 text-amber-600" /> Invoice
                       </button>
                       <button
                         onClick={() => openEditModal(o)}
-                        className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold rounded-xl inline-flex items-center gap-1 transition cursor-pointer"
+                        className="px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold rounded-xl inline-flex items-center gap-1.5 transition cursor-pointer shadow-sm"
                         title="Edit Products & Items"
                       >
                         <Edit3 className="w-3.5 h-3.5" /> Edit Products
@@ -582,7 +569,7 @@ export default function AdminOrdersPage() {
                       <select
                         value={o.status || 'Pending'}
                         onChange={(e) => updateOrderStatus(o.id, e.target.value)}
-                        className="bg-white border border-slate-200 text-slate-700 text-[11px] rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm font-bold"
+                        className="bg-white border border-slate-200 text-slate-800 text-[11px] rounded-xl px-3 py-2 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm font-bold"
                       >
                         <option value="Pending">Pending</option>
                         <option value="Processing">Processing</option>
@@ -593,10 +580,10 @@ export default function AdminOrdersPage() {
                       </select>
                       <button
                         onClick={() => handleDeleteOrder(o.id)}
-                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition cursor-pointer inline-flex items-center"
+                        className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition cursor-pointer inline-flex items-center shadow-sm align-middle"
                         title="Delete Order"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
@@ -616,11 +603,10 @@ export default function AdminOrdersPage() {
                 <h3 className="text-lg font-black text-slate-900">Edit Products for Order #XFP-{editingOrder.id}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Billed to: <strong className="text-slate-800">{editingOrder.buyer_name}</strong> ({editingOrder.buyer_role?.toUpperCase()})</p>
               </div>
-              <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
+              <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleUpdateOrder} className="space-y-6">
-              {/* Category Filter for Edit Catalog */}
               <div className="space-y-3">
                 <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
                 <div className="flex flex-wrap gap-2">
@@ -703,7 +689,7 @@ export default function AdminOrdersPage() {
                         <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
                         <div className="flex items-center gap-3">
                           <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
-                          <button type="button" onClick={() => handleRemoveEditItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button type="button" onClick={() => handleRemoveEditItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
                     ))}
@@ -729,7 +715,7 @@ export default function AdminOrdersPage() {
                 <h3 className="text-lg font-black text-slate-900">Create Order for Downline Partner</h3>
                 <p className="text-xs text-slate-500 mt-0.5">Rates automatically apply per partner pricing structure (Packet/Carton & GST).</p>
               </div>
-              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
+              <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleCreateOrder} className="space-y-6">
@@ -739,7 +725,7 @@ export default function AdminOrdersPage() {
                   value={selectedBuyerId}
                   onChange={(e) => handlePartnerSelect(e.target.value)}
                   required
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition cursor-pointer"
                 >
                   <option value="">-- Choose Partner / Vendor --</option>
                   {downlineUsers.map((u) => (
@@ -831,7 +817,7 @@ export default function AdminOrdersPage() {
                         <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
                         <div className="flex items-center gap-3">
                           <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} (+{item.gstPercent}% GST) = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
-                          <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                          <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
                     ))}
@@ -852,7 +838,7 @@ export default function AdminOrdersPage() {
       {invoiceOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white text-slate-900 rounded-3xl w-full max-w-2xl p-8 space-y-6 shadow-2xl relative border border-slate-200 my-8">
-            <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
+            <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
             
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-slate-200 pb-4">
