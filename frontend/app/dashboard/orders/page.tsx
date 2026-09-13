@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
 import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 
 export default function AdminOrdersPage() {
@@ -260,10 +259,10 @@ export default function AdminOrdersPage() {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text('BILLED TO (VENDOR / PARTNER DETAILS)', 20, 71);
+      pdf.text('BILLED TO (SELECTED VENDOR / PARTNER)', 20, 71);
       pdf.text('FULFILLED BY (UPLINE HUB)', 110, 71);
 
-      // Buyer Details
+      // Buyer Details (Selected Vendor)
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
@@ -290,7 +289,7 @@ export default function AdminOrdersPage() {
       pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
 
       // Itemized Table Header
-      let startY = 112;
+      let startY = 114;
       pdf.setFillColor(241, 245, 249);
       pdf.rect(15, startY, 180, 8, 'F');
       pdf.setFont('helvetica', 'bold');
@@ -301,7 +300,7 @@ export default function AdminOrdersPage() {
       pdf.text('UNIT PRICE', 150, startY + 5.5, { align: 'right' });
       pdf.text('TOTAL', 190, startY + 5.5, { align: 'right' });
 
-      // Itemized Data Row (Simulated line item for the order total or multiple if available)
+      // Itemized Data Row
       startY += 12;
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
@@ -317,12 +316,12 @@ export default function AdminOrdersPage() {
       pdf.setDrawColor(226, 232, 240);
       pdf.line(15, startY, 195, startY);
 
-      startY += 10;
-      // Grand Total Summary Box
+      startY += 12;
+      // Grand Total Summary Box (Properly Aligned & Non-Overlapping)
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
       pdf.setTextColor(15, 23, 42);
-      pdf.text('Grand Total (Incl. GST):', 130, startY);
+      pdf.text('Grand Total (Incl. GST):', 120, startY);
       pdf.setTextColor(217, 119, 6);
       pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, startY, { align: 'right' });
 
@@ -581,14 +580,14 @@ export default function AdminOrdersPage() {
                   <img src="/images/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
                   <div>
                     <h3 className="text-base font-black text-slate-900">XLLENT FOODS INVOICE</h3>
-                    <p className="text-[11px] text-slate-500">Order #XFP-{invoiceOrder.id} — {invoiceOrder.buyer_name}</p>
+                    <p className="text-[11px] text-slate-500">Order #XFP-{invoiceOrder.id} — Billed To: {invoiceOrder.buyer_name}</p>
                   </div>
                 </div>
                 <span className="px-3 py-1 bg-amber-100 text-amber-800 font-bold rounded-xl text-xs">₹{invoiceOrder.total_amount}</span>
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-xs">
-                <p><strong>Billed To:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
+                <p><strong>Selected Vendor / Partner:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
                 <p><strong>Role & Status:</strong> {invoiceOrder.buyer_role?.toUpperCase()} — <span className="text-amber-600 font-bold">{invoiceOrder.status}</span></p>
                 <p><strong>Fulfiller Upline:</strong> {invoiceOrder.seller_name || 'Direct Admin Hub'}</p>
               </div>
