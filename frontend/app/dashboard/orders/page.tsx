@@ -182,7 +182,8 @@ export default function AdminOrdersPage() {
     if (!input) return;
     try {
       setIsDownloading(true);
-      const canvas = await html2canvas(input, { scale: 2, useCORS: true });
+      // Fixed code:
+const canvas = await html2canvas(input, { scale: 2, useCORS: true } as any);
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
