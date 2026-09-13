@@ -232,7 +232,7 @@ export default function AdminOrdersPage() {
 
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184);
-      pdf.text('Official Tax Invoice & Fulfillment Receipt', textXOffset, 30);
+      pdf.text('Official Tax Invoice & Itemized Bill', textXOffset, 30);
 
       // Invoice Meta
       pdf.setFont('helvetica', 'bold');
@@ -255,7 +255,7 @@ export default function AdminOrdersPage() {
       // Expanded Vendor & Buyer Details Box
       pdf.setDrawColor(226, 232, 240);
       pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(15, 63, 180, 44, 3, 3, 'FD');
+      pdf.roundedRect(15, 63, 180, 42, 3, 3, 'FD');
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
@@ -274,7 +274,7 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(71, 85, 105);
       pdf.text(`Email: ${invoiceOrder.buyer_email || 'N/A'}`, 20, 85);
       pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Shop').toUpperCase()}`, 20, 91);
-      pdf.text(`Location / Region: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 97);
+      pdf.text(`Status: ${(invoiceOrder.status || 'Pending').toUpperCase()}`, 20, 97);
 
       // Seller Details
       pdf.setFont('helvetica', 'bold');
@@ -289,34 +289,48 @@ export default function AdminOrdersPage() {
       pdf.text(`Network Role: ${(invoiceOrder.seller_role || 'Admin').toUpperCase()}`, 110, 91);
       pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
 
-      // Table Header
+      // Itemized Table Header
+      let startY = 112;
       pdf.setFillColor(241, 245, 249);
-      pdf.rect(15, 114, 180, 10, 'F');
+      pdf.rect(15, startY, 180, 8, 'F');
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9);
+      pdf.setFontSize(8.5);
       pdf.setTextColor(71, 85, 105);
-      pdf.text('ORDER STATUS & DETAILS', 20, 120.5);
-      pdf.text('GRAND TOTAL (INCL. GST)', 190, 120.5, { align: 'right' });
+      pdf.text('ITEM / PRODUCT DESCRIPTION', 20, startY + 5.5);
+      pdf.text('QTY', 120, startY + 5.5, { align: 'right' });
+      pdf.text('UNIT PRICE', 150, startY + 5.5, { align: 'right' });
+      pdf.text('TOTAL', 190, startY + 5.5, { align: 'right' });
 
-      // Table Data Row
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(10);
+      // Itemized Data Row (Simulated line item for the order total or multiple if available)
+      startY += 12;
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
       pdf.setTextColor(15, 23, 42);
-      pdf.text((invoiceOrder.status || 'Pending').toUpperCase(), 20, 134);
-      
-      pdf.setFontSize(13);
-      pdf.setTextColor(217, 119, 6);
-      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, 134, { align: 'right' });
+      pdf.text(`Standard Distribution Order Fulfillment (#XFP-${invoiceOrder.id})`, 20, startY);
+      pdf.text('1', 120, startY, { align: 'right' });
+      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 150, startY, { align: 'right' });
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, startY, { align: 'right' });
 
+      startY += 8;
       // Divider Line
       pdf.setDrawColor(226, 232, 240);
-      pdf.line(15, 144, 195, 144);
+      pdf.line(15, startY, 195, startY);
+
+      startY += 10;
+      // Grand Total Summary Box
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text('Grand Total (Incl. GST):', 130, startY);
+      pdf.setTextColor(217, 119, 6);
+      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, startY, { align: 'right' });
 
       // Terms & Conditions
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184);
-      pdf.text('Terms & Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.', 15, 156);
+      pdf.text('Terms & Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.', 15, 245);
 
       // Footer
       pdf.setFillColor(248, 250, 252);
@@ -555,64 +569,33 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Invoice Modal with Official Logo & PDF Download */}
+      {/* Invoice Preview Modal */}
       {invoiceOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white text-slate-900 rounded-3xl w-full max-w-2xl p-8 space-y-6 shadow-2xl relative border border-slate-200 my-8">
             <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             
-            {/* Printable Container for PDF Export */}
-            <div id="invoice-pdf-content" className="bg-white p-6 rounded-2xl space-y-6">
-              <div className="flex justify-between items-start border-b border-slate-200 pb-5">
-                <div className="flex items-center gap-3.5">
-                  <img src="/images/logo.png" alt="Xllent Foods Logo" className="w-14 h-14 object-contain rounded-2xl border border-slate-200 bg-white p-1" crossOrigin="anonymous" />
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                <div className="flex items-center gap-3">
+                  <img src="/images/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
                   <div>
-                    <h2 className="text-xl font-black text-slate-900 tracking-tight">XLLENT FOODS</h2>
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Distribution Management System</p>
-                    <p className="text-[10px] text-amber-600 font-extrabold mt-0.5">GSTIN: 27AABCX1234F1Z5</p>
+                    <h3 className="text-base font-black text-slate-900">XLLENT FOODS INVOICE</h3>
+                    <p className="text-[11px] text-slate-500">Order #XFP-{invoiceOrder.id} — {invoiceOrder.buyer_name}</p>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="font-mono text-xs font-bold text-slate-800">Tax Invoice #XFP-INV-{invoiceOrder.id}</p>
-                  <p className="text-[11px] text-slate-500">{new Date(invoiceOrder.created_at).toLocaleDateString()}</p>
-                  <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase rounded-md">GST Tax Invoice</span>
-                </div>
+                <span className="px-3 py-1 bg-amber-100 text-amber-800 font-bold rounded-xl text-xs">₹{invoiceOrder.total_amount}</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
-                <div>
-                  <span className="text-slate-400 block font-bold uppercase text-[10px]">Billed To (Downstream Partner):</span>
-                  <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.buyer_name}</p>
-                  <p className="text-slate-600 text-[11px]">{invoiceOrder.buyer_email} ({invoiceOrder.buyer_role})</p>
-                </div>
-                <div>
-                  <span className="text-slate-400 block font-bold uppercase text-[10px]">Fulfilled By (Upline):</span>
-                  <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.seller_name || 'Xllent Foods Central Hub'}</p>
-                  <p className="text-slate-600 text-[11px]">Authorized Distribution Network</p>
-                </div>
-              </div>
-
-              <div className="border border-slate-200 rounded-2xl overflow-hidden">
-                <table className="w-full text-left text-xs">
-                  <thead>
-                    <tr className="bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-wider">
-                      <th className="p-3">Fulfillment Status</th>
-                      <th className="p-3 text-right">Grand Total (Incl. GST)</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-t border-slate-100">
-                      <td className="p-3 font-bold text-slate-800 uppercase">{invoiceOrder.status}</td>
-                      <td className="p-3 text-right font-black text-slate-900 text-sm">₹{invoiceOrder.total_amount}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-xs">
+                <p><strong>Billed To:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
+                <p><strong>Role & Status:</strong> {invoiceOrder.buyer_role?.toUpperCase()} — <span className="text-amber-600 font-bold">{invoiceOrder.status}</span></p>
+                <p><strong>Fulfiller Upline:</strong> {invoiceOrder.seller_name || 'Direct Admin Hub'}</p>
               </div>
             </div>
 
-            {/* Footer Actions / Download PDF */}
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-              <span className="text-xs text-slate-500 font-medium">Thank you for your business partnership with Xllent Foods!</span>
+              <span className="text-xs text-slate-500 font-medium">Click below to download professional PDF invoice.</span>
               <button 
                 onClick={handleDownloadPDF} 
                 disabled={isDownloading}
