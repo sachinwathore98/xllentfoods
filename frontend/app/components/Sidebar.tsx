@@ -13,7 +13,7 @@ export default function Sidebar({ role }: SidebarProps) {
   const navItems = [
     { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard },
     { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package },
-    { name: 'Inventory Stocks', href: '/dashboard/inventory/stocks', icon: Boxes },
+    { name: 'Stock Management', href: '/dashboard/inventory/stocks', icon: Boxes },
     { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign },
     { name: 'Partnership Enquiries', href: '/dashboard/enquiries', icon: Users },
     { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', icon: ShoppingCart },
