@@ -184,16 +184,8 @@ export default function AdminOrdersPage() {
       const canvas = await html2canvas(input, { 
         scale: 2, 
         useCORS: true,
-        backgroundColor: '#ffffff',
-        onclone: (clonedDoc: any) => {
-          const elements = clonedDoc.querySelectorAll('*');
-          elements.forEach((el: any) => {
-            const bg = window.getComputedStyle(el).backgroundColor;
-            if (bg && bg.includes('lab')) {
-              el.style.backgroundColor = '#ffffff';
-            }
-          });
-        }
+        allowTaint: true,
+        backgroundColor: '#ffffff'
       } as any);
 
       const imgData = canvas.toDataURL('image/png');
