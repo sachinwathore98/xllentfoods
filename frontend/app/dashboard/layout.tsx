@@ -56,6 +56,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const navLinks = [
     { name: 'Overview', href: '/dashboard/overview', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
     { name: 'Inventory & Catalog', href: '/dashboard/inventory', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Stock Management', href: '/dashboard/inventory/stocks', roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
     { name: 'Downstream Pricing', href: '/dashboard/pricing', roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
     { name: 'Partnership Enquiries', href: '/dashboard/enquiries', roles: ['superadmin', 'admin'] },
     { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
