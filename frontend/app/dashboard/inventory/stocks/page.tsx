@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { Package, Search, Layers, AlertCircle, Boxes } from 'lucide-react';
+import { Package, Search, Boxes } from 'lucide-react';
 
 interface ProductStock {
   id: number;
@@ -59,7 +59,6 @@ export default function LiveInventoryStockPage() {
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 text-slate-800 bg-slate-50 min-h-screen">
-      {/* Header */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
@@ -75,7 +74,6 @@ export default function LiveInventoryStockPage() {
         </button>
       </div>
 
-      {/* Search and Category Filters */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
@@ -111,7 +109,6 @@ export default function LiveInventoryStockPage() {
         </div>
       </div>
 
-      {/* Stock Table Grid */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         {loading ? (
           <div className="text-center py-20 text-slate-400 text-xs font-bold animate-pulse">Loading live inventory stocks...</div>
