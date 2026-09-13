@@ -27,8 +27,7 @@ export default function AdminOrdersPage() {
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [editStatus, setEditStatus] = useState('Pending');
   const [editItems, setEditItems] = useState<any[]>([]);
-  const [selectedAddProductId, setSelectedAddProductId] = useState('');
-  const [addQuantity, setAddQuantity] = useState(1);
+  const [editCategory, setEditCategory] = useState('All');
 
   // Invoice State
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
@@ -176,10 +175,11 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Open Edit Order Modal
+  // Open Edit Order Modal & Load Pricing for that specific buyer
   const openEditModal = async (order: any) => {
     setEditingOrder(order);
     setEditStatus(order.status || 'Pending');
+    setEditCategory('All');
     setEditItems(order.items ? order.items.map((i: any) => ({
       productId: i.product_id || i.productId,
       name: i.name,
@@ -188,44 +188,45 @@ export default function AdminOrdersPage() {
       unitPrice: i.unit_price || i.unitPrice,
       gstPercent: i.gst_percent || i.gstPercent || 0
     })) : []);
-  };
 
-  const handleEditQuantityChange = (index: number, qty: number) => {
-    const quantity = Math.max(0, qty);
-    setEditItems((prev) => {
-      if (quantity === 0) {
-        return prev.filter((_, idx) => idx !== index);
+    // Fetch pricing for this order's buyer
+    if (order.buyer_id) {
+      try {
+        const res = await API.get(`/api/downline-pricing/${order.buyer_id}`);
+        setPartnerPricing(res.data.pricing || []);
+      } catch (err) {
+        console.error('Failed to fetch pricing for edit modal', err);
       }
-      return prev.map((item, idx) => idx === index ? { ...item, quantity } : item);
-    });
+    }
   };
 
-  const handleRemoveEditItem = (index: number) => {
-    setEditItems((prev) => prev.filter((_, idx) => idx !== index));
-  };
-
-  const handleAddProductToEditOrder = () => {
-    if (!selectedAddProductId) return;
-    const prod = products.find((p) => p.id === Number(selectedAddProductId));
-    if (!prod) return;
+  const handleEditItemQuantity = (productId: number, qty: number) => {
+    const quantity = Math.max(0, qty);
+    const unitPrice = getProductEffectivePrice(productId);
+    const prod = products.find(p => p.id === productId);
 
     setEditItems((prev) => {
-      const existing = prev.find((i) => i.productId === prod.id);
+      const existing = prev.find((item) => item.productId === productId);
+      if (quantity === 0) {
+        return prev.filter((item) => item.productId !== productId);
+      }
       if (existing) {
-        return prev.map((i) => i.productId === prod.id ? { ...i, quantity: i.quantity + Number(addQuantity) } : i);
+        return prev.map((item) => item.productId === productId ? { ...item, quantity, unitPrice } : item);
       } else {
         return [...prev, {
-          productId: prod.id,
-          name: prod.name,
-          sku: prod.sku || 'N/A',
-          quantity: Number(addQuantity),
-          unitPrice: Number(prod.mrp),
-          gstPercent: Number(prod.gst_percent || 0)
+          productId,
+          name: prod?.name || 'Product',
+          sku: prod?.sku || 'N/A',
+          quantity,
+          unitPrice,
+          gstPercent: Number(prod?.gst_percent || 0)
         }];
       }
     });
-    setSelectedAddProductId('');
-    setAddQuantity(1);
+  };
+
+  const handleRemoveEditItem = (productId: number) => {
+    setEditItems((prev) => prev.filter((item) => item.productId !== productId));
   };
 
   const handleUpdateOrder = async (e: React.FormEvent) => {
@@ -244,9 +245,9 @@ export default function AdminOrdersPage() {
       });
       setEditingOrder(null);
       fetchOrders(currentUser.id, currentUser.role);
-      alert('Order successfully updated with new items and totals!');
+      alert('Order items and products successfully updated!');
     } catch (err) {
-      console.error('Failed to update order', err);
+      console.error('Failed to update order products', err);
       alert('Failed to update order.');
     }
   };
@@ -454,6 +455,10 @@ export default function AdminOrdersPage() {
     ? products 
     : products.filter(p => p.category === selectedCategory);
 
+  const editFilteredProducts = editCategory === 'All'
+    ? products
+    : products.filter(p => p.category === editCategory);
+
   // Filter and Search Orders
   const filteredOrders = orders.filter((o) => {
     const matchesSearch = 
@@ -570,10 +575,22 @@ export default function AdminOrdersPage() {
                       <button
                         onClick={() => openEditModal(o)}
                         className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold rounded-xl inline-flex items-center gap-1 transition cursor-pointer"
-                        title="Edit Order Items & Add Products"
+                        title="Edit Products & Items"
                       >
-                        <Edit3 className="w-3.5 h-3.5" /> Edit
+                        <Edit3 className="w-3.5 h-3.5" /> Edit Products
                       </button>
+                      <select
+                        value={o.status || 'Pending'}
+                        onChange={(e) => updateOrderStatus(o.id, e.target.value)}
+                        className="bg-white border border-slate-200 text-slate-700 text-[11px] rounded-xl px-2.5 py-1.5 focus:outline-none focus:border-amber-500 cursor-pointer shadow-sm font-bold"
+                      >
+                        <option value="Pending">Pending</option>
+                        <option value="Processing">Processing</option>
+                        <option value="Dispatched">Dispatched</option>
+                        <option value="Completed">Completed</option>
+                        <option value="Approved">Approved</option>
+                        <option value="Cancelled">Cancelled</option>
+                      </select>
                       <button
                         onClick={() => handleDeleteOrder(o.id)}
                         className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition cursor-pointer inline-flex items-center"
@@ -590,103 +607,113 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Edit Order Modal */}
+      {/* Edit Order Modal with Category Catalog & Photos */}
       {editingOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Edit Order #XFP-{editingOrder.id}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Add products, modify quantities, or change status for {editingOrder.buyer_name}</p>
+                <h3 className="text-lg font-black text-slate-900">Edit Products for Order #XFP-{editingOrder.id}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Billed to: <strong className="text-slate-800">{editingOrder.buyer_name}</strong> ({editingOrder.buyer_role?.toUpperCase()})</p>
               </div>
               <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleUpdateOrder} className="space-y-6">
-              <div>
-                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Fulfillment Status</label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 transition cursor-pointer"
-                >
-                  <option value="Pending">Pending</option>
-                  <option value="Processing">Processing</option>
-                  <option value="Dispatched">Dispatched</option>
-                  <option value="Completed">Completed</option>
-                  <option value="Approved">Approved</option>
-                  <option value="Cancelled">Cancelled</option>
-                </select>
-              </div>
-
-              {/* Add New Product Section */}
-              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-                <label className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Add Product to Order</label>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <select
-                    value={selectedAddProductId}
-                    onChange={(e) => setSelectedAddProductId(e.target.value)}
-                    className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="">-- Select Product from Catalog --</option>
-                    {products.map((p) => (
-                      <option key={p.id} value={p.id}>{p.name} (SKU: {p.sku} | ₹{p.mrp})</option>
-                    ))}
-                  </select>
-                  <input
-                    type="number"
-                    min="1"
-                    value={addQuantity}
-                    onChange={(e) => setAddQuantity(Number(e.target.value))}
-                    className="w-24 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-center focus:outline-none focus:border-amber-500"
-                    placeholder="Qty"
-                  />
+              {/* Category Filter for Edit Catalog */}
+              <div className="space-y-3">
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
+                <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
-                    onClick={handleAddProductToEditOrder}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition shrink-0 cursor-pointer"
+                    onClick={() => setEditCategory('All')}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      editCategory === 'All' ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                   >
-                    Add Product
+                    All Products
                   </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => setEditCategory(cat.name)}
+                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        editCategory === cat.name ? 'bg-amber-500 text-slate-950 shadow-md shadow-amber-500/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
                 </div>
-              </div>
 
-              <div className="space-y-3">
-                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Existing Order Items ({editItems.length})</label>
-                <div className="border border-slate-200 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3 space-y-2">
-                  {editItems.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-400 font-medium">No items in this order. Add a product above.</div>
+                <div className="border border-slate-200 rounded-2xl max-h-72 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3">
+                  {editFilteredProducts.length === 0 ? (
+                    <div className="text-center py-8 text-xs text-slate-400 font-medium">No products found in this category.</div>
                   ) : (
-                    editItems.map((item, idx) => (
-                      <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white rounded-xl border border-slate-200 gap-4">
-                        <div>
-                          <p className="text-xs font-black text-slate-900">{item.name}</p>
-                          <p className="text-[10px] text-slate-500">SKU: {item.sku} | Price: ₹{item.unitPrice} | GST: {item.gstPercent || 0}%</p>
+                    editFilteredProducts.map((p) => {
+                      const currentItem = editItems.find(i => i.productId === p.id);
+                      const qty = currentItem ? currentItem.quantity : 0;
+                      const effectivePrice = getProductEffectivePrice(p.id);
+                      return (
+                        <div key={p.id} className="flex items-center justify-between py-3 px-3 hover:bg-white rounded-2xl transition gap-4">
+                          <div className="flex items-center gap-3.5">
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded-xl border border-slate-200 shrink-0" />
+                            ) : (
+                              <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center shrink-0 text-slate-400">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-xs font-black text-slate-900">{p.name}</p>
+                              <p className="text-[10px] text-slate-500">
+                                SKU: {p.sku || 'N/A'} | Rate: <span className="font-bold text-slate-800">₹{effectivePrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Qty:</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={qty}
+                              onChange={(e) => handleEditItemQuantity(p.id, Number(e.target.value))}
+                              className="w-20 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
+                            />
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="number"
-                            min="1"
-                            value={item.quantity}
-                            onChange={(e) => handleEditQuantityChange(idx, Number(e.target.value))}
-                            className="w-16 bg-slate-50 border border-slate-300 rounded-xl px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-amber-500"
-                          />
-                          <button type="button" onClick={() => handleRemoveEditItem(idx)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-4 h-4" /></button>
-                        </div>
-                      </div>
-                    ))
+                      );
+                    })
                   )}
                 </div>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex justify-between items-center text-xs font-black text-amber-900">
-                <span>Updated Grand Total (Incl. GST):</span>
-                <span className="text-base text-amber-600">₹{editItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice * (1 + (item.gstPercent || 0)/100)), 0).toFixed(2)}</span>
-              </div>
+              {editItems.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs font-black text-amber-900 uppercase tracking-wider">Current Order Summary ({editItems.length} items)</span>
+                    <div className="text-right text-xs font-black text-amber-900">
+                      <span>Total with GST: ₹{editItems.reduce((acc, i) => acc + (i.quantity * i.unitPrice * (1 + i.gstPercent/100)), 0).toFixed(2)}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
+                    {editItems.map((item) => (
+                      <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
+                        <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
+                          <button type="button" onClick={() => handleRemoveEditItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
-              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+              <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setEditingOrder(null)} className="px-5 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Save Changes</button>
+                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Save Order Changes</button>
               </div>
             </form>
           </div>
