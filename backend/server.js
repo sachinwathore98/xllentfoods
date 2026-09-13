@@ -3,7 +3,6 @@ const { Pool } = require('pg');
 const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const SibApiV3Sdk = require('@getbrevo/brevo');
 require('dotenv').config();
 
 const app = express();
@@ -466,7 +465,7 @@ app.get('/api/orders', async (req, res) => {
     const { userId, role } = req.query;
     let query = `
       SELECT o.id, o.total_amount, o.status, o.created_at, 
-             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Buyer') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role,
+             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Buyer') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role, COALESCE(b.location, '') as buyer_location,
              COALESCE(s.id, 0) as seller_id, COALESCE(s.name, 'Direct Admin') as seller_name, COALESCE(s.role, 'admin') as seller_role
       FROM orders o
       LEFT JOIN users b ON o.buyer_id = b.id
@@ -479,7 +478,22 @@ app.get('/api/orders', async (req, res) => {
     }
     query += ` ORDER BY o.created_at DESC`;
     const result = await pool.query(query, params);
-    res.json({ orders: result.rows });
+    
+    // Fetch items for each order so itemized PDF generation works correctly
+    const ordersWithItems = await Promise.all(result.rows.map(async (order) => {
+      const itemsRes = await pool.query(`
+        SELECT oi.quantity, oi.unit_price, p.name, p.sku, p.gst_percent 
+        FROM order_items oi 
+        LEFT JOIN products p ON oi.product_id = p.id 
+        WHERE oi.order_id = $1
+      `, [order.id]);
+      return {
+        ...order,
+        items: itemsRes.rows
+      };
+    }));
+
+    res.json({ orders: ordersWithItems });
   } catch (err) {
     res.status(500).json({ message: `Failed to fetch orders: ${err.message}` });
   }
@@ -496,16 +510,16 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
-// Delete Order and its associated items
+// Delete Order and its associated items using `pool` instead of undefined `supabase` client
 app.delete('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    // First delete dependent order items to satisfy foreign key constraints
-    await supabase.from('order_items').delete().eq('order_id', id);
+    // First delete dependent order items using pool
+    await pool.query('DELETE FROM order_items WHERE order_id = $1', [id]);
     
     // Then delete the order itself
-    const { error } = await supabase.from('orders').delete().eq('id', id);
-    if (error) throw error;
+    const result = await pool.query('DELETE FROM orders WHERE id = $1 RETURNING *', [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Order not found' });
     
     res.json({ success: true, message: 'Order successfully deleted' });
   } catch (err) {
@@ -603,7 +617,7 @@ app.post('/api/admin/advertisements', async (req, res) => {
     );
     res.status(201).json({ message: 'Advertisement added successfully', advertisement: result.rows[0] });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to add advertisement' });
+    res.status(500).json({ message: 'Failed to delete advertisement' });
   }
 });
 
