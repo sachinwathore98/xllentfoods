@@ -27,6 +27,8 @@ export default function AdminOrdersPage() {
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [editStatus, setEditStatus] = useState('Pending');
   const [editItems, setEditItems] = useState<any[]>([]);
+  const [selectedAddProductId, setSelectedAddProductId] = useState('');
+  const [addQuantity, setAddQuantity] = useState(1);
 
   // Invoice State
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
@@ -178,7 +180,6 @@ export default function AdminOrdersPage() {
   const openEditModal = async (order: any) => {
     setEditingOrder(order);
     setEditStatus(order.status || 'Pending');
-    // Fetch pricing for buyer if needed, or map existing items
     setEditItems(order.items ? order.items.map((i: any) => ({
       productId: i.product_id || i.productId,
       name: i.name,
@@ -201,6 +202,30 @@ export default function AdminOrdersPage() {
 
   const handleRemoveEditItem = (index: number) => {
     setEditItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddProductToEditOrder = () => {
+    if (!selectedAddProductId) return;
+    const prod = products.find((p) => p.id === Number(selectedAddProductId));
+    if (!prod) return;
+
+    setEditItems((prev) => {
+      const existing = prev.find((i) => i.productId === prod.id);
+      if (existing) {
+        return prev.map((i) => i.productId === prod.id ? { ...i, quantity: i.quantity + Number(addQuantity) } : i);
+      } else {
+        return [...prev, {
+          productId: prod.id,
+          name: prod.name,
+          sku: prod.sku || 'N/A',
+          quantity: Number(addQuantity),
+          unitPrice: Number(prod.mrp),
+          gstPercent: Number(prod.gst_percent || 0)
+        }];
+      }
+    });
+    setSelectedAddProductId('');
+    setAddQuantity(1);
   };
 
   const handleUpdateOrder = async (e: React.FormEvent) => {
@@ -545,7 +570,7 @@ export default function AdminOrdersPage() {
                       <button
                         onClick={() => openEditModal(o)}
                         className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold rounded-xl inline-flex items-center gap-1 transition cursor-pointer"
-                        title="Edit Order Items"
+                        title="Edit Order Items & Add Products"
                       >
                         <Edit3 className="w-3.5 h-3.5" /> Edit
                       </button>
@@ -572,7 +597,7 @@ export default function AdminOrdersPage() {
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900">Edit Order #XFP-{editingOrder.id}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Modify items, quantities, or fulfillment status for {editingOrder.buyer_name}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Add products, modify quantities, or change status for {editingOrder.buyer_name}</p>
               </div>
               <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             </div>
@@ -594,17 +619,49 @@ export default function AdminOrdersPage() {
                 </select>
               </div>
 
+              {/* Add New Product Section */}
+              <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
+                <label className="block text-[11px] font-extrabold text-slate-700 uppercase tracking-wider">Add Product to Order</label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <select
+                    value={selectedAddProductId}
+                    onChange={(e) => setSelectedAddProductId(e.target.value)}
+                    className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="">-- Select Product from Catalog --</option>
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name} (SKU: {p.sku} | ₹{p.mrp})</option>
+                    ))}
+                  </select>
+                  <input
+                    type="number"
+                    min="1"
+                    value={addQuantity}
+                    onChange={(e) => setAddQuantity(Number(e.target.value))}
+                    className="w-24 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-center focus:outline-none focus:border-amber-500"
+                    placeholder="Qty"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddProductToEditOrder}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition shrink-0 cursor-pointer"
+                  >
+                    Add Product
+                  </button>
+                </div>
+              </div>
+
               <div className="space-y-3">
-                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Order Items & Quantities</label>
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Existing Order Items ({editItems.length})</label>
                 <div className="border border-slate-200 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3 space-y-2">
                   {editItems.length === 0 ? (
-                    <div className="text-center py-6 text-xs text-slate-400 font-medium">No items in this order.</div>
+                    <div className="text-center py-6 text-xs text-slate-400 font-medium">No items in this order. Add a product above.</div>
                   ) : (
                     editItems.map((item, idx) => (
                       <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white rounded-xl border border-slate-200 gap-4">
                         <div>
                           <p className="text-xs font-black text-slate-900">{item.name}</p>
-                          <p className="text-[10px] text-slate-500">SKU: {item.sku} | Price: ₹{item.unitPrice}</p>
+                          <p className="text-[10px] text-slate-500">SKU: {item.sku} | Price: ₹{item.unitPrice} | GST: {item.gstPercent || 0}%</p>
                         </div>
                         <div className="flex items-center gap-3">
                           <input
