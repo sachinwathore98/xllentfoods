@@ -70,16 +70,24 @@ export default function CreateAndManageUsersPage() {
 
   const getFilteredParents = () => {
     if (role === 'admin') {
+      // Admin -> Only Superadmin (no other admin)
       return parentsList.filter(p => p.role === 'superadmin');
     }
     if (role === 'super_stockist') {
+      // Super Stockist -> Admin or Superadmin
       return parentsList.filter(p => p.role === 'admin' || p.role === 'superadmin');
     }
     if (role === 'distributor') {
-      return parentsList.filter(p => p.role === 'super_stockist');
+      // Distributor -> Super Stockist, Admin, or Superadmin
+      return parentsList.filter(p => p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
-    if (role === 'shop' || role === 'employee') {
-      return parentsList.filter(p => p.role === 'super_stockist' || p.role === 'distributor');
+    if (role === 'shop') {
+      // Retail Shop -> Distributor preferred, fallback/allow Super Stockist, Admin, or Superadmin if no distributor
+      return parentsList.filter(p => p.role === 'distributor' || p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
+    }
+    if (role === 'employee') {
+      // Field Employee -> Distributor, Super Stockist, Admin, or Superadmin
+      return parentsList.filter(p => p.role === 'distributor' || p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
     return parentsList;
   };
