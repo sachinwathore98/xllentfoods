@@ -300,24 +300,32 @@ export default function AdminOrdersPage() {
       pdf.text('UNIT PRICE', 150, startY + 5.5, { align: 'right' });
       pdf.text('TOTAL', 190, startY + 5.5, { align: 'right' });
 
-      // Itemized Data Row
+      // Itemized Data Rows (Looping through order items if present)
       startY += 12;
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(15, 23, 42);
-      pdf.text(`Standard Distribution Order Fulfillment (#XFP-${invoiceOrder.id})`, 20, startY);
-      pdf.text('1', 120, startY, { align: 'right' });
-      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 150, startY, { align: 'right' });
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, startY, { align: 'right' });
 
-      startY += 8;
+      const itemsList = invoiceOrder.items || [{ name: `Standard Distribution Order (#XFP-${invoiceOrder.id})`, quantity: 1, unitPrice: invoiceOrder.total_amount }];
+      
+      itemsList.forEach((item: any, idx: number) => {
+        const itemY = startY + (idx * 8);
+        const itemTotal = (item.quantity || 1) * (item.unitPrice || invoiceOrder.total_amount);
+        pdf.text(item.name || item.product_name || `Product Item #${idx + 1}`, 20, itemY);
+        pdf.text(String(item.quantity || 1), 120, itemY, { align: 'right' });
+        pdf.text(`Rs. ${item.unitPrice || invoiceOrder.total_amount}`, 150, itemY, { align: 'right' });
+        pdf.setFont('helvetica', 'bold');
+        pdf.text(`Rs. ${itemTotal.toFixed(2)}`, 190, itemY, { align: 'right' });
+        pdf.setFont('helvetica', 'normal');
+      });
+
+      startY += (itemsList.length * 8) + 4;
       // Divider Line
       pdf.setDrawColor(226, 232, 240);
       pdf.line(15, startY, 195, startY);
 
-      startY += 12;
-      // Grand Total Summary Box (Properly Aligned & Non-Overlapping)
+      startY += 10;
+      // Grand Total Summary Box
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
       pdf.setTextColor(15, 23, 42);
@@ -594,7 +602,7 @@ export default function AdminOrdersPage() {
             </div>
 
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-              <span className="text-xs text-slate-500 font-medium">Click below to download professional PDF invoice.</span>
+              <span className="text-xs text-slate-500 font-medium">Click below to download professional PDF invoice with itemized products.</span>
               <button 
                 onClick={handleDownloadPDF} 
                 disabled={isDownloading}
