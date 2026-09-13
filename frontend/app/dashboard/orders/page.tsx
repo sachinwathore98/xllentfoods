@@ -176,37 +176,91 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    const input = document.getElementById('invoice-pdf-content');
-    if (!input) return;
+  const handleDownloadPDF = () => {
+    if (!invoiceOrder) return;
     try {
       setIsDownloading(true);
-      const canvas = await html2canvas(input, { 
-        scale: 2, 
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      } as any);
-
-      const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgWidth = 210;
-      const pageHeight = 295;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
+      
+      // Header Background
+      pdf.setFillColor(245, 158, 11); // Amber-500
+      pdf.rect(0, 0, 210, 35, 'F');
 
-      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      // Header Title
+      pdf.setTextColor(15, 23, 42); // Slate-900
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(22);
+      pdf.text('XLLENT FOODS', 15, 20);
 
-      while (heightLeft >= 0) {
-        position = heightLeft - imgHeight;
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
+      pdf.setFontSize(10);
+      pdf.text('DISTRIBUTION MANAGEMENT SYSTEM | TAX INVOICE', 15, 27);
 
-      pdf.save(`Xllent_Foods_Invoice_${invoiceOrder?.id || 'Bill'}.pdf`);
+      // Invoice Details (Right Aligned)
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFontSize(11);
+      pdf.text(`Invoice #XFP-INV-${invoiceOrder.id}`, 195, 18, { align: 'right' });
+      pdf.setFontSize(9);
+      pdf.text(`Date: ${new Date(invoiceOrder.created_at).toLocaleDateString()}`, 195, 25, { align: 'right' });
+
+      // Reset text color for body
+      pdf.setTextColor(30, 41, 59);
+
+      // GSTIN & Metadata
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('GSTIN: 27AABCX1234F1Z5', 15, 48);
+
+      // Billing Box
+      pdf.setFillColor(248, 250, 252); // Slate-50
+      pdf.setDrawColor(226, 232, 240); // Slate-200
+      pdf.roundedRect(15, 55, 180, 30, 3, 3, 'FD');
+
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('BILLED TO (DOWNSTREAM PARTNER):', 20, 64);
+      pdf.text('FULFILLED BY (UPLINE):', 110, 64);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(15, 23, 42);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(invoiceOrder.buyer_name || 'N/A', 20, 71);
+      pdf.text(invoiceOrder.seller_name || 'Xllent Foods Central Hub', 110, 71);
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Role: ${invoiceOrder.buyer_role || 'Shop'}`, 20, 78);
+      pdf.text(`Authorized Distribution Network`, 110, 78);
+
+      // Table Header
+      pdf.setFillColor(241, 245, 249); // Slate-100
+      pdf.rect(15, 95, 180, 10, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text('FULFILLMENT STATUS', 20, 101.5);
+      pdf.text('GRAND TOTAL (INCL. GST)', 190, 101.5, { align: 'right' });
+
+      // Table Row
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(15, 23, 42);
+      pdf.text((invoiceOrder.status || 'Pending').toUpperCase(), 20, 114);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, 114, { align: 'right' });
+
+      // Divider line
+      pdf.setDrawColor(226, 232, 240);
+      pdf.line(15, 122, 195, 122);
+
+      // Footer
+      pdf.setFont('helvetica', 'italic');
+      pdf.setFontSize(9);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('Thank you for your business partnership with Xllent Foods!', 105, 135, { align: 'center' });
+
+      // Save PDF
+      pdf.save(`Xllent_Foods_Invoice_${invoiceOrder.id}.pdf`);
     } catch (err) {
       console.error('PDF generation error:', err);
       alert('Failed to download PDF invoice.');
