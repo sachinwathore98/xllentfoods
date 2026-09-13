@@ -20,7 +20,7 @@ export default function AdminOrdersPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [orderItems, setOrderItems] = useState<{ productId: number; name: string; category: string; quantity: number; unitPrice: number; gstPercent: number }[]>([]);
   
-  // Invoice & Edit States
+  // Invoice State
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -184,8 +184,18 @@ export default function AdminOrdersPage() {
       const canvas = await html2canvas(input, { 
         scale: 2, 
         useCORS: true,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        onclone: (clonedDoc: any) => {
+          const elements = clonedDoc.querySelectorAll('*');
+          elements.forEach((el: any) => {
+            const bg = window.getComputedStyle(el).backgroundColor;
+            if (bg && bg.includes('lab')) {
+              el.style.backgroundColor = '#ffffff';
+            }
+          });
+        }
       } as any);
+
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgWidth = 210;
