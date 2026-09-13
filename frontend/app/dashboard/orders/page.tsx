@@ -1,13 +1,14 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X, Package, Trash2 } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Trash2, Package } from 'lucide-react';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [downlineUsers, setDownlineUsers] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
+  const [partnerPricing, setPartnerPricing] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
@@ -15,7 +16,7 @@ export default function AdminOrdersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedBuyerId, setSelectedBuyerId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; category: string; quantity: number; unitPrice: number }[]>([]);
+  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; category: string; quantity: number; unitPrice: number; gstPercent: number }[]>([]);
   
   // Invoice Modal State
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
@@ -71,17 +72,50 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handleQuantityChange = (productId: number, qty: number, mrp: number, name: string, category: string) => {
+  // When partner is selected, fetch their customized/role-based pricing sheet
+  const handlePartnerSelect = async (buyerId: string) => {
+    setSelectedBuyerId(buyerId);
+    if (!buyerId) {
+      setPartnerPricing([]);
+      return;
+    }
+    try {
+      const res = await API.get(`/api/downline-pricing/${buyerId}`);
+      setPartnerPricing(res.data.pricing || []);
+    } catch (err) {
+      console.error('Failed to fetch partner pricing', err);
+    }
+  };
+
+  const getProductEffectivePrice = (productId: number) => {
+    const pricingMatch = partnerPricing.find((p) => p.product_id === productId);
+    if (pricingMatch) {
+      return Number(pricingMatch.effective_price || pricingMatch.mrp || 0);
+    }
+    const prod = products.find((p) => p.id === productId);
+    return prod ? Number(prod.mrp) : 0;
+  };
+
+  const handleQuantityChange = (product: any, qty: number) => {
     const quantity = Math.max(0, qty);
+    const unitPrice = getProductEffectivePrice(product.id);
+
     setOrderItems((prev) => {
-      const existing = prev.find((item) => item.productId === productId);
+      const existing = prev.find((item) => item.productId === product.id);
       if (quantity === 0) {
-        return prev.filter((item) => item.productId !== productId);
+        return prev.filter((item) => item.productId !== product.id);
       }
       if (existing) {
-        return prev.map((item) => item.productId === productId ? { ...item, quantity } : item);
+        return prev.map((item) => item.productId === product.id ? { ...item, quantity, unitPrice } : item);
       } else {
-        return [...prev, { productId, name, category, quantity, unitPrice: Number(mrp) }];
+        return [...prev, { 
+          productId: product.id, 
+          name: product.name, 
+          category: product.category, 
+          quantity, 
+          unitPrice, 
+          gstPercent: Number(product.gst_percent || 0) 
+        }];
       }
     });
   };
@@ -93,11 +127,13 @@ export default function AdminOrdersPage() {
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBuyerId || orderItems.length === 0) {
-      alert('Please select a downstream user and add at least one product item with quantity.');
+      alert('Please select a downstream partner and add at least one product with quantity.');
       return;
     }
 
-    const totalAmount = orderItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+    const subtotal = orderItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+    const totalGst = orderItems.reduce((acc, item) => acc + ((item.quantity * item.unitPrice * item.gstPercent) / 100), 0);
+    const totalAmount = Number((subtotal + totalGst).toFixed(2));
 
     try {
       await API.post('/api/orders/smart', {
@@ -109,8 +145,9 @@ export default function AdminOrdersPage() {
       setIsCreateModalOpen(false);
       setOrderItems([]);
       setSelectedBuyerId('');
+      setPartnerPricing([]);
       fetchOrders(currentUser.id, currentUser.role);
-      alert('Order successfully created for downstream user!');
+      alert('Order successfully created and synced to downstream dashboard!');
     } catch (err) {
       console.error('Create Order Error', err);
       alert('Failed to create order.');
@@ -137,7 +174,7 @@ export default function AdminOrdersPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders & Downstream Feed</h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Portal Role: <span className="text-amber-600 font-extrabold uppercase">{currentUser?.role}</span>. Manage fulfillment requests and dispatch downstream invoices.
+            Portal Role: <span className="text-amber-600 font-extrabold uppercase">{currentUser?.role}</span>. Manage automated fulfillment and tax invoices.
           </p>
         </div>
         <button
@@ -212,14 +249,14 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Create Order Modal with Category & Full Product Catalog Picker */}
+      {/* Create Order Modal with Product Images & Auto-Role Pricing */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-3xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900">Create Order for Downstream Partner</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Select partner account and assign required quantities from catalog.</p>
+                <p className="text-xs text-slate-500 mt-0.5">Rates automatically apply per partner pricing structure (Packet/Carton & GST).</p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             </div>
@@ -230,7 +267,7 @@ export default function AdminOrdersPage() {
                 <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Select Downstream Partner Account</label>
                 <select
                   value={selectedBuyerId}
-                  onChange={(e) => setSelectedBuyerId(e.target.value)}
+                  onChange={(e) => handlePartnerSelect(e.target.value)}
                   required
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
                 >
@@ -268,28 +305,40 @@ export default function AdminOrdersPage() {
                   ))}
                 </div>
 
-                {/* Product Selection Grid */}
-                <div className="border border-slate-200 rounded-2xl max-h-64 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3">
+                {/* Product Selection Grid with Images */}
+                <div className="border border-slate-200 rounded-2xl max-h-72 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3">
                   {filteredProducts.length === 0 ? (
                     <div className="text-center py-8 text-xs text-slate-400 font-medium">No products found in this category.</div>
                   ) : (
                     filteredProducts.map((p) => {
                       const currentItem = orderItems.find(i => i.productId === p.id);
                       const qty = currentItem ? currentItem.quantity : 0;
+                      const effectivePrice = getProductEffectivePrice(p.id);
                       return (
-                        <div key={p.id} className="flex items-center justify-between py-2.5 px-3 hover:bg-white rounded-xl transition">
-                          <div>
-                            <p className="text-xs font-black text-slate-900">{p.name}</p>
-                            <p className="text-[10px] text-slate-500">SKU: {p.sku} | MRP: <span className="font-bold text-slate-800">₹{p.mrp}</span> | <span className="text-amber-600 font-bold">{p.category}</span></p>
+                        <div key={p.id} className="flex items-center justify-between py-3 px-3 hover:bg-white rounded-2xl transition gap-4">
+                          <div className="flex items-center gap-3.5">
+                            {p.image ? (
+                              <img src={p.image} alt={p.name} className="w-12 h-12 object-cover rounded-xl border border-slate-200 shrink-0" />
+                            ) : (
+                              <div className="w-12 h-12 bg-slate-200 rounded-xl flex items-center justify-center shrink-0 text-slate-400">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="text-xs font-black text-slate-900">{p.name}</p>
+                              <p className="text-[10px] text-slate-500">
+                                SKU: {p.sku} | Rate: <span className="font-bold text-slate-800">₹{effectivePrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
+                              </p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <span className="text-[10px] font-bold text-slate-400 uppercase">Qty:</span>
                             <input
                               type="number"
                               min="0"
                               value={qty}
-                              onChange={(e) => handleQuantityChange(p.id, Number(e.target.value), p.mrp, p.name, p.category)}
-                              className="w-16 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
+                              onChange={(e) => handleQuantityChange(p, Number(e.target.value))}
+                              className="w-20 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
                             />
                           </div>
                         </div>
@@ -299,19 +348,22 @@ export default function AdminOrdersPage() {
                 </div>
               </div>
 
-              {/* Selected Order Summary Review */}
+              {/* Selected Order Summary Review with GST */}
               {orderItems.length > 0 && (
                 <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs font-black text-amber-900 uppercase tracking-wider">Order Items Summary ({orderItems.length})</span>
-                    <span className="text-xs font-black text-amber-900">Total: ₹{orderItems.reduce((acc, i) => acc + (i.quantity * i.unitPrice), 0)}</span>
+                    <span className="text-xs font-black text-amber-900 uppercase tracking-wider">Order Summary ({orderItems.length} items)</span>
+                    <div className="text-right text-xs font-black text-amber-900">
+                      <span>Subtotal: ₹{orderItems.reduce((acc, i) => acc + (i.quantity * i.unitPrice), 0).toFixed(2)}</span>
+                      <span className="block text-[11px] text-amber-700">Total with GST: ₹{orderItems.reduce((acc, i) => acc + (i.quantity * i.unitPrice * (1 + i.gstPercent/100)), 0).toFixed(2)}</span>
+                    </div>
                   </div>
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
                     {orderItems.map((item) => (
-                      <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2 rounded-xl border border-amber-100 shadow-sm">
+                      <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
                         <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.category})</span></span>
                         <div className="flex items-center gap-3">
-                          <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} = <strong className="text-slate-900">₹{item.quantity * item.unitPrice}</strong></span>
+                          <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} (+{item.gstPercent}% GST) = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
                           <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
@@ -330,26 +382,33 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Invoice Modal / Bill Generator */}
+      {/* Invoice Modal / PDF Download with Logo & GST Bill */}
       {invoiceOrder && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white text-slate-900 rounded-3xl w-full max-w-xl p-8 space-y-6 shadow-2xl relative border border-slate-200">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white text-slate-900 rounded-3xl w-full max-w-2xl p-8 space-y-6 shadow-2xl relative border border-slate-200 my-8">
             <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             
-            <div className="flex justify-between items-start border-b border-slate-200 pb-4">
-              <div>
-                <h2 className="text-xl font-black text-amber-600">XLLENT FOODS</h2>
-                <p className="text-[11px] text-slate-500 uppercase tracking-widest font-bold">Distribution Tax Invoice</p>
+            {/* Printable Invoice Header with Logo & GST */}
+            <div className="flex justify-between items-start border-b border-slate-200 pb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-amber-500 rounded-2xl flex items-center justify-center text-slate-950 font-black text-lg shadow-md">XF</div>
+                <div>
+                  <h2 className="text-xl font-black text-slate-900 tracking-tight">XLLENT FOODS</h2>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Distribution Management System</p>
+                  <p className="text-[10px] text-amber-600 font-extrabold mt-0.5">GSTIN: 27AABCX1234F1Z5</p>
+                </div>
               </div>
               <div className="text-right">
-                <p className="font-mono text-xs font-bold text-slate-800">Invoice #XFP-INV-{invoiceOrder.id}</p>
+                <p className="font-mono text-xs font-bold text-slate-800">Tax Invoice #XFP-INV-{invoiceOrder.id}</p>
                 <p className="text-[11px] text-slate-500">{new Date(invoiceOrder.created_at).toLocaleDateString()}</p>
+                <span className="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase rounded-md">GST Verified</span>
               </div>
             </div>
 
+            {/* Billing Details */}
             <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
               <div>
-                <span className="text-slate-400 block font-bold uppercase text-[10px]">Billed To (Downstream):</span>
+                <span className="text-slate-400 block font-bold uppercase text-[10px]">Billed To (Downstream Partner):</span>
                 <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.buyer_name}</p>
                 <p className="text-slate-600 text-[11px]">{invoiceOrder.buyer_email} ({invoiceOrder.buyer_role})</p>
               </div>
@@ -359,26 +418,33 @@ export default function AdminOrdersPage() {
               </div>
             </div>
 
+            {/* Invoice Summary */}
             <div className="border border-slate-200 rounded-2xl overflow-hidden">
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-wider">
-                    <th className="p-3">Order Status</th>
-                    <th className="p-3 text-right">Total Amount</th>
+                    <th className="p-3">Fulfillment Status</th>
+                    <th className="p-3 text-right">Grand Total (Incl. GST)</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr className="border-t border-slate-100">
-                    <td className="p-3 font-bold">{invoiceOrder.status}</td>
-                    <td className="p-3 text-right font-black text-slate-900">₹{invoiceOrder.total_amount}</td>
+                    <td className="p-3 font-bold text-slate-800">{invoiceOrder.status}</td>
+                    <td className="p-3 text-right font-black text-slate-900 text-sm">₹{invoiceOrder.total_amount}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
+            {/* Footer / Print Button */}
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-              <span className="text-xs text-slate-500 font-medium">Thank you for your business partnership!</span>
-              <button onClick={() => window.print()} className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-xl text-xs shadow hover:shadow-md transition cursor-pointer">Print Invoice</button>
+              <span className="text-xs text-slate-500 font-medium">Thank you for your business partnership with Xllent Foods!</span>
+              <button 
+                onClick={() => window.print()} 
+                className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer"
+              >
+                Download / Print PDF Invoice
+              </button>
             </div>
           </div>
         </div>
