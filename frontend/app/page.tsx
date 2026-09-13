@@ -4,7 +4,7 @@ import Link from 'next/link';
 import API from '@/app/lib/api';
 import Navbar from '@/app/components/Navbar';
 import Footer from '@/app/components/Footer';
-import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, Zap, Sparkles, TrendingUp, ShieldCheck, Award, ChevronRight } from 'lucide-react';
+import { Package, Search, Plus, ShoppingCart, SlidersHorizontal, ArrowUpDown, Zap, Sparkles, TrendingUp, ShieldCheck, Award, ChevronRight, X, ShoppingBag } from 'lucide-react';
 
 const SLIDER_IMAGES = [
   '/images/slider-1.png',
@@ -21,12 +21,13 @@ export default function HomePage() {
   const [sortBy, setSortBy] = useState('default');
   const [searchTerm, setSearchTerm] = useState('');
   const [cart, setCart] = useState<any[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % SLIDER_IMAGES.length);
-    }, 4000);
+    }, 4500);
     return () => clearInterval(timer);
   }, []);
 
@@ -78,6 +79,7 @@ export default function HomePage() {
       }
       return [...prev, { ...product, quantity: 1 }];
     });
+    setIsCartOpen(true);
   };
 
   let filteredProducts = products.filter((p) => 
@@ -102,13 +104,12 @@ export default function HomePage() {
   }, 0);
   const cartGrandTotal = cartSubtotal + totalGstAmount;
 
-  // Separate horizontal and vertical ads
   const horizontalAds = ads.filter((ad) => ad.banner_type === 'horizontal' || !ad.banner_type);
   const verticalAds = ads.filter((ad) => ad.banner_type === 'vertical');
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col justify-between selection:bg-amber-500 selection:text-white">
-      <Navbar />
+      <Navbar cartCount={cart.reduce((acc, item) => acc + item.quantity, 0)} onOpenCart={() => setIsCartOpen(true)} />
 
       {/* Top Animated Ticker */}
       <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-yellow-500 text-white text-xs font-bold py-2.5 px-4 text-center tracking-wider uppercase shadow-inner flex items-center justify-center gap-2 animate-pulse">
@@ -119,7 +120,7 @@ export default function HomePage() {
 
       {/* Main Hero Slider */}
       <section className="relative w-full overflow-hidden bg-slate-950 shadow-2xl">
-        <div className="relative w-full min-h-[300px] sm:min-h-[440px] flex items-center justify-center">
+        <div className="relative w-full min-h-[300px] sm:min-h-[460px] flex items-center justify-center">
           {SLIDER_IMAGES.map((img, index) => (
             <div
               key={index}
@@ -129,7 +130,7 @@ export default function HomePage() {
             >
               <img src={img} alt={`Banner ${index + 1}`} className="w-full h-full object-cover brightness-95" />
               <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex flex-col justify-end p-6 sm:p-12">
-                <div className="max-w-7xl mx-auto w-full space-y-2">
+                <div className="max-w-[95rem] mx-auto w-full space-y-2">
                   <span className="bg-amber-500 text-slate-950 text-[10px] sm:text-xs font-black uppercase px-3.5 py-1 rounded-full shadow-lg tracking-widest inline-block">
                     Verified CPG Network
                   </span>
@@ -150,7 +151,7 @@ export default function HomePage() {
 
       {/* Trust Badges */}
       <section className="bg-white border-b border-slate-200 py-4 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div className="max-w-[95rem] mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
           <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700"><Award className="w-5 h-5 text-amber-600" /> Direct Manufacturer Pricing</div>
           <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700"><TrendingUp className="w-5 h-5 text-amber-600" /> High-Margin Tiers</div>
           <div className="flex items-center justify-center gap-2 text-xs font-bold text-slate-700"><ShieldCheck className="w-5 h-5 text-amber-600" /> Secure GST Invoicing</div>
@@ -159,9 +160,9 @@ export default function HomePage() {
       </section>
 
       {/* Search & Filter Bar */}
-      <section className="max-w-[90rem] mx-auto px-4 sm:px-6 w-full pt-8">
+      <section className="max-w-[95rem] mx-auto px-4 sm:px-6 w-full pt-8">
         <div className="bg-white p-5 sm:p-6 rounded-3xl shadow-xl border border-slate-200 flex flex-col md:flex-row justify-between items-center gap-4">
-          <div className="w-full md:w-[460px]">
+          <div className="w-full md:w-[480px]">
             <div className="relative">
               <Search className="absolute left-4 top-3.5 w-4 h-4 text-amber-600" />
               <input
@@ -198,8 +199,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Main Catalog View */}
-      <main className="flex-grow max-w-[90rem] mx-auto px-4 sm:px-6 py-10 w-full">
+      {/* Main Full-Screen Catalog View */}
+      <main className="flex-grow max-w-[95rem] mx-auto px-4 sm:px-6 py-10 w-full">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
             <span className="p-2.5 bg-amber-500/10 text-amber-600 rounded-2xl shadow-sm"><Zap className="w-5 h-5" /></span>
@@ -210,179 +211,228 @@ export default function HomePage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3 space-y-8">
-            {loading ? (
-              <div className="text-center py-24 text-slate-400 text-sm font-bold animate-pulse">Loading live catalog inventory...</div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-24 bg-white rounded-3xl border border-slate-200 text-slate-400 text-sm font-bold">No products found.</div>
-            ) : (
-              <div>
-                {filteredProducts.map((product, index) => {
-                  const adIndex = Math.floor(index / 20);
-                  const activeHorizontalAd = horizontalAds.length > 0 ? horizontalAds[adIndex % horizontalAds.length] : null;
-                  const showHorizontalAd = (index + 1) % 20 === 0 && activeHorizontalAd;
+        <div className="w-full">
+          {loading ? (
+            <div className="text-center py-24 text-slate-400 text-sm font-bold animate-pulse">Loading live catalog inventory...</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-24 bg-white rounded-3xl border border-slate-200 text-slate-400 text-sm font-bold">No products found.</div>
+          ) : (
+            <div>
+              {filteredProducts.map((product, index) => {
+                const adIndex = Math.floor(index / 20);
+                const activeHorizontalAd = horizontalAds.length > 0 ? horizontalAds[adIndex % horizontalAds.length] : null;
+                const showHorizontalAd = (index + 1) % 20 === 0 && activeHorizontalAd;
 
-                  const isGridStart = index % 10 === 0;
-                  const gridChunk = filteredProducts.slice(index, index + 10);
+                const isGridStart = index % 10 === 0;
+                const gridChunk = filteredProducts.slice(index, index + 10);
 
-                  if (!isGridStart) return null;
+                if (!isGridStart) return null;
 
-                  return (
-                    <React.Fragment key={`chunk-${index}`}>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 mb-8">
-                        {gridChunk.map((p) => (
-                          <div key={p.id} className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5 flex flex-col justify-between group">
-                            <div>
-                              <Link href={`/products/${p.id}`} className="block relative">
-                                <div className="h-36 sm:h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
-                                  {p.image ? (
-                                    <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
-                                  ) : (
-                                    <Package className="w-10 h-10 text-slate-300" />
-                                  )}
-                                  <span className="absolute top-2 left-2 bg-slate-900/90 backdrop-blur-md text-amber-400 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">
-                                    {p.category || 'FMCG'}
-                                  </span>
-                                </div>
+                // Determine ticker type based on chunk index: 0->Category, 1->Product, 2->Category, 3->Product...
+                const chunkCycleIndex = Math.floor(index / 10);
+                const isCategoryTicker = chunkCycleIndex % 2 === 0;
+
+                // For product tickers, pick unique distinct products slice so every ticker is different
+                const tickerProductsSlice = products.slice((chunkCycleIndex * 5) % Math.max(1, products.length - 5), ((chunkCycleIndex * 5) % Math.max(1, products.length - 5)) + 6);
+
+                return (
+                  <React.Fragment key={`chunk-${index}`}>
+                    {/* Full-Screen Grid Chunk (10 Products) */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 mb-8">
+                      {gridChunk.map((p) => (
+                        <div key={p.id} className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-md hover:shadow-2xl transition-all duration-300 hover:-translate-y-1.5 flex flex-col justify-between group">
+                          <div>
+                            <Link href={`/products/${p.id}`} className="block relative">
+                              <div className="h-40 sm:h-44 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                                {p.image ? (
+                                  <img src={p.image} alt={p.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-700" />
+                                ) : (
+                                  <Package className="w-10 h-10 text-slate-300" />
+                                )}
+                                <span className="absolute top-2 left-2 bg-slate-900/90 backdrop-blur-md text-amber-400 text-[10px] font-black px-2.5 py-1 rounded-lg uppercase tracking-wider">
+                                  {p.category || 'FMCG'}
+                                </span>
+                              </div>
+                            </Link>
+                            <div className="p-4">
+                              <Link href={`/products/${p.id}`}>
+                                <h3 className="font-black text-slate-900 text-xs sm:text-sm truncate group-hover:text-amber-600 transition">{p.name}</h3>
                               </Link>
-                              <div className="p-4">
-                                <Link href={`/products/${p.id}`}>
-                                  <h3 className="font-black text-slate-900 text-xs sm:text-sm truncate group-hover:text-amber-600 transition">{p.name}</h3>
-                                </Link>
-                                <div className="flex justify-between items-center mt-1">
-                                  <span className="text-[10px] text-slate-400 font-mono font-bold">SKU: {p.sku || 'N/A'}</span>
-                                  <span className="text-[10px] font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100">GST {p.gst_percent || 0}%</span>
-                                </div>
-                                <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2 font-light">{p.description || 'Premium quality FMCG product.'}</p>
-                                
-                                <div className="mt-3 text-[10px] text-slate-600 bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/60 flex flex-col gap-0.5 font-bold">
-                                  <span className="text-amber-800">📦 Pkt: {p.pieces_per_packet || 1} Pcs</span>
-                                  <span className="text-blue-800">📦 Ctn: {p.packets_per_carton || 1} Pkts</span>
-                                </div>
+                              <div className="flex justify-between items-center mt-1">
+                                <span className="text-[10px] text-slate-400 font-mono font-bold">SKU: {p.sku || 'N/A'}</span>
+                                <span className="text-[10px] font-black text-purple-700 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-100">GST {p.gst_percent || 0}%</span>
                               </div>
-                            </div>
-                            <div className="p-4 pt-0 flex justify-between items-center border-t border-slate-100 mt-2">
-                              <div>
-                                <span className="text-[9px] uppercase font-black text-slate-400 block tracking-wider">MRP</span>
-                                <span className="text-sm sm:text-base font-black text-slate-900">₹{p.mrp}</span>
+                              <p className="text-[11px] text-slate-500 mt-1.5 line-clamp-2 font-light">{p.description || 'Premium quality FMCG product.'}</p>
+                              
+                              <div className="mt-3 text-[10px] text-slate-600 bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/60 flex flex-col gap-0.5 font-bold">
+                                <span className="text-amber-800">📦 Pkt: {p.pieces_per_packet || 1} Pcs</span>
+                                <span className="text-blue-800">📦 Ctn: {p.packets_per_carton || 1} Pkts</span>
                               </div>
-                              <button
-                                onClick={() => addToCart(p)}
-                                className="px-3.5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold rounded-2xl text-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-600/30 hover:scale-105 active:scale-95"
-                              >
-                                <Plus className="w-3.5 h-3.5" /> Add
-                              </button>
                             </div>
                           </div>
-                        ))}
-                      </div>
-
-                      {/* Right-to-Left Ticker Slider Every 10 Products */}
-                      <div className="my-10 bg-slate-900 py-6 rounded-3xl shadow-xl overflow-hidden relative border border-slate-800">
-                        <div className="px-6 mb-3 flex items-center justify-between">
-                          <span className="text-xs font-black uppercase text-amber-400 tracking-widest flex items-center gap-2">
-                            <Sparkles className="w-4 h-4" /> Trending Categories & Highlights
-                          </span>
-                          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Live Ticker Feed</span>
-                        </div>
-                        <div className="flex overflow-x-hidden whitespace-nowrap relative w-full">
-                          <div className="flex animate-marquee gap-6 items-center">
-                            {categories.concat(categories).map((cat, idx) => (
-                              <div key={idx} className="flex items-center gap-3 bg-slate-800/80 border border-slate-700 px-5 py-3 rounded-2xl shadow-md shrink-0 hover:border-amber-500 transition cursor-pointer">
-                                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping" />
-                                <span className="text-white text-xs font-black tracking-wide uppercase">{cat.name} Collection</span>
-                                <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
-                              </div>
-                            ))}
+                          <div className="p-4 pt-0 flex justify-between items-center border-t border-slate-100 mt-2">
+                            <div>
+                              <span className="text-[9px] uppercase font-black text-slate-400 block tracking-wider">MRP</span>
+                              <span className="text-sm sm:text-base font-black text-slate-900">₹{p.mrp}</span>
+                            </div>
+                            <button
+                              onClick={() => addToCart(p)}
+                              className="px-3.5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-extrabold rounded-2xl text-xs transition-all duration-300 flex items-center gap-1.5 cursor-pointer shadow-lg shadow-amber-600/30 hover:scale-105 active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> Add
+                            </button>
                           </div>
                         </div>
+                      ))}
+                    </div>
+
+                    {/* Live Alternating Ticker Slider with Images and Click Redirects */}
+                    <div className="my-10 bg-slate-900 py-6 rounded-3xl shadow-xl overflow-hidden relative border border-slate-800">
+                      <div className="px-6 mb-3 flex items-center justify-between">
+                        <span className="text-xs font-black uppercase text-amber-400 tracking-widest flex items-center gap-2">
+                          <Sparkles className="w-4 h-4" /> {isCategoryTicker ? 'Featured Categories Spotlight' : 'Best-Selling Spotlight Products'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Live Interactive Feed</span>
                       </div>
-
-                      {/* Horizontal Ad Banner */}
-                      {showHorizontalAd && (
-                        <div className="my-8 overflow-hidden rounded-3xl shadow-2xl border-2 border-amber-400/50 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950">
-                          <a href={activeHorizontalAd.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-48 sm:h-60 group">
-                            <img src={activeHorizontalAd.image_url} alt="Sponsored Banner" className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-90" />
-                            <div className="absolute top-4 left-4 bg-amber-500 text-slate-950 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-xl flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5" /> {activeHorizontalAd.title || 'Featured Promotional Ad'}
-                            </div>
-                          </a>
+                      <div className="flex overflow-x-hidden whitespace-nowrap relative w-full">
+                        <div className="flex animate-marquee gap-6 items-center">
+                          {isCategoryTicker
+                            ? categories.concat(categories).map((cat, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleCategoryChange(cat.name)}
+                                  className="flex items-center gap-3 bg-slate-800/90 border border-slate-700 p-2.5 pr-5 rounded-2xl shadow-md shrink-0 hover:border-amber-500 transition cursor-pointer text-left group"
+                                >
+                                  <div className="w-12 h-12 rounded-xl bg-amber-500/10 overflow-hidden flex items-center justify-center shrink-0 border border-slate-700">
+                                    <Package className="w-6 h-6 text-amber-500 group-hover:scale-110 transition" />
+                                  </div>
+                                  <div>
+                                    <span className="text-white text-xs font-black tracking-wide uppercase block group-hover:text-amber-400 transition">{cat.name}</span>
+                                    <span className="text-[10px] text-slate-400 font-semibold">Explore Catalog $\rightarrow$</span>
+                                  </div>
+                                </button>
+                              ))
+                            : tickerProductsSlice.concat(tickerProductsSlice).map((prod, idx) => (
+                                <a
+                                  key={idx}
+                                  href={`/products/${prod.id}`}
+                                  className="flex items-center gap-3 bg-slate-800/90 border border-slate-700 p-2.5 pr-5 rounded-2xl shadow-md shrink-0 hover:border-amber-500 transition cursor-pointer text-left group"
+                                >
+                                  <div className="w-12 h-12 rounded-xl bg-slate-700 overflow-hidden flex items-center justify-center shrink-0 border border-slate-600">
+                                    {prod.image ? (
+                                      <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-110 transition" />
+                                    ) : (
+                                      <Package className="w-6 h-6 text-slate-400" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="text-white text-xs font-black tracking-wide truncate max-w-[140px] block group-hover:text-amber-400 transition">{prod.name}</span>
+                                    <span className="text-[10px] text-amber-400 font-bold">₹{prod.mrp} — View Product $\rightarrow$</span>
+                                  </div>
+                                </a>
+                              ))}
                         </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                      </div>
+                    </div>
 
-          {/* Right Sidebar containing Cart AND Vertical Ad Banners */}
-          <div className="lg:col-span-1 space-y-6">
-            <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-xl sticky top-28 space-y-4">
-              <div className="flex items-center gap-2.5 border-b border-slate-100 pb-4">
-                <span className="p-2 bg-amber-500/10 text-amber-600 rounded-xl"><ShoppingCart className="w-5 h-5" /></span>
-                <h3 className="font-black text-slate-900 text-base">Your Cart ({cart.reduce((acc, item) => acc + item.quantity, 0)})</h3>
+                    {/* Horizontal Ad Banner */}
+                    {showHorizontalAd && (
+                      <div className="my-8 overflow-hidden rounded-3xl shadow-2xl border-2 border-amber-400/50 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950">
+                        <a href={activeHorizontalAd.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-48 sm:h-60 group">
+                          <img src={activeHorizontalAd.image_url} alt="Sponsored Banner" className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-90" />
+                          <div className="absolute top-4 left-4 bg-amber-500 text-slate-950 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-xl flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> {activeHorizontalAd.title || 'Featured Promotional Ad'}
+                          </div>
+                        </a>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </main>
+
+      {/* Floating / Sliding Cart Drawer (Full-Screen Layout Optimized) */}
+      {isCartOpen && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex justify-end animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md h-full shadow-2xl flex flex-col justify-between p-6 sm:p-8 animate-in slide-in-from-right duration-300">
+            <div className="space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-2 bg-amber-500/10 text-amber-600 rounded-xl"><ShoppingBag className="w-5 h-5" /></span>
+                  <h3 className="font-black text-slate-900 text-lg">Your Wholesale Cart ({cart.reduce((acc, item) => acc + item.quantity, 0)})</h3>
+                </div>
+                <button onClick={() => setIsCartOpen(false)} className="text-slate-400 hover:text-slate-600 p-2 cursor-pointer">
+                  <X className="w-6 h-6" />
+                </button>
               </div>
 
               {cart.length === 0 ? (
-                <div className="text-center py-12 space-y-2">
-                  <ShoppingCart className="w-10 h-10 text-slate-300 mx-auto animate-bounce" />
-                  <p className="text-xs text-slate-400 font-semibold">Your cart is empty. Add items to order.</p>
+                <div className="text-center py-20 space-y-3">
+                  <ShoppingBag className="w-12 h-12 text-slate-300 mx-auto animate-bounce" />
+                  <p className="text-sm text-slate-400 font-semibold">Your cart is empty. Add products to build your order.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="max-h-60 overflow-y-auto space-y-3 pr-1">
-                    {cart.map((item) => (
-                      <div key={item.id} className="flex justify-between items-center text-xs border-b border-slate-100 pb-2.5">
-                        <div>
-                          <p className="font-extrabold text-slate-900 truncate max-w-[130px]">{item.name}</p>
-                          <p className="text-slate-400 text-[11px]">Qty: {item.quantity} × ₹{item.mrp} <span className="text-purple-700 font-bold">({item.gst_percent || 0}% GST)</span></p>
-                        </div>
-                        <p className="font-black text-slate-900 text-sm">₹{item.quantity * item.mrp}</p>
+                <div className="max-h-[55vh] overflow-y-auto space-y-3 pr-2">
+                  {cart.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center text-xs sm:text-sm border-b border-slate-100 pb-3">
+                      <div>
+                        <p className="font-extrabold text-slate-900 max-w-[160px]">{item.name}</p>
+                        <p className="text-slate-400 text-xs">Qty: {item.quantity} × ₹{item.mrp} <span className="text-purple-700 font-bold">({item.gst_percent || 0}% GST)</span></p>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="pt-4 space-y-2 border-t-2 border-dashed border-slate-200 text-xs sm:text-sm">
-                    <div className="flex justify-between text-slate-600"><span>Subtotal:</span><span className="font-bold">₹{cartSubtotal.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-slate-600"><span>Total GST:</span><span className="font-bold text-purple-700">+ ₹{totalGstAmount.toFixed(2)}</span></div>
-                    <div className="pt-3 flex justify-between items-center font-black text-base border-t border-slate-200">
-                      <span>Grand Total:</span>
-                      <span className="text-amber-600 text-lg">₹{cartGrandTotal.toFixed(2)}</span>
+                      <p className="font-black text-slate-900 text-sm">₹{item.quantity * item.mrp}</p>
                     </div>
-                  </div>
-
-                  <a href="/login" className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl text-xs sm:text-sm uppercase tracking-wider block text-center shadow-xl shadow-amber-600/30 transition-all hover:scale-[1.02]">
-                    Proceed to Checkout
-                  </a>
+                  ))}
                 </div>
               )}
             </div>
 
-            {/* Vertical Promotional Ad Banners in Sidebar */}
-            {verticalAds.length > 0 && (
-              <div className="bg-slate-950 p-4 rounded-3xl shadow-xl border border-slate-800 space-y-4 text-white">
-                <div className="flex items-center justify-between text-[10px] font-black uppercase text-amber-400 tracking-widest border-b border-slate-800 pb-2">
-                  <span>Sponsored Spot</span>
-                  <Sparkles className="w-3.5 h-3.5" />
-                </div>
-                {verticalAds.map((ad, idx) => (
-                  <div key={idx} className="rounded-2xl overflow-hidden border border-slate-800 group relative">
-                    <a href={ad.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-64 sm:h-72">
-                      <img src={ad.image_url} alt="Vertical Ad" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent p-4 flex flex-col justify-end">
-                        <span className="text-xs font-black text-white">{ad.title || 'Exclusive Wholesale Deal'}</span>
-                        <span className="text-[10px] text-amber-400 uppercase font-bold mt-1">Tap to explore partner offers</span>
-                      </div>
-                    </a>
+            {cart.length > 0 && (
+              <div className="space-y-4 pt-4 border-t border-slate-200">
+                <div className="space-y-1.5 text-xs sm:text-sm">
+                  <div className="flex justify-between text-slate-600"><span>Subtotal:</span><span className="font-bold">₹{cartSubtotal.toFixed(2)}</span></div>
+                  <div className="flex justify-between text-slate-600"><span>Total GST:</span><span className="font-bold text-purple-700">+ ₹{totalGstAmount.toFixed(2)}</span></div>
+                  <div className="pt-2 flex justify-between items-center font-black text-base sm:text-lg border-t border-slate-200">
+                    <span>Grand Total:</span>
+                    <span className="text-amber-600">₹{cartGrandTotal.toFixed(2)}</span>
                   </div>
-                ))}
+                </div>
+
+                <a href="/login" className="w-full py-4 bg-amber-600 hover:bg-amber-700 text-white font-black rounded-2xl text-xs sm:text-sm uppercase tracking-wider block text-center shadow-xl shadow-amber-600/30 transition-all hover:scale-[1.02]">
+                  Proceed to Checkout
+                </a>
               </div>
             )}
           </div>
         </div>
-      </main>
+      )}
+
+      {/* Vertical Banners Floating Widget / Section on Mobile & Desktop */}
+      {verticalAds.length > 0 && (
+        <section className="max-w-[95rem] mx-auto px-4 sm:px-6 py-8 w-full">
+          <div className="bg-slate-950 p-6 rounded-3xl shadow-2xl border border-slate-800 space-y-4 text-white">
+            <div className="flex items-center justify-between text-xs font-black uppercase text-amber-400 tracking-widest border-b border-slate-800 pb-3">
+              <span>Exclusive Partner Spotlights</span>
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {verticalAds.map((ad, idx) => (
+                <div key={idx} className="rounded-2xl overflow-hidden border border-slate-800 group relative">
+                  <a href={ad.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-64 sm:h-80">
+                    <img src={ad.image_url} alt="Vertical Ad" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-transparent to-transparent p-4 flex flex-col justify-end">
+                      <span className="text-sm font-black text-white">{ad.title || 'Exclusive Wholesale Deal'}</span>
+                      <span className="text-xs text-amber-400 uppercase font-bold mt-1">Tap to explore offers $\rightarrow$</span>
+                    </div>
+                  </a>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <Footer />
 
@@ -394,7 +444,7 @@ export default function HomePage() {
         .animate-marquee {
           display: flex;
           width: max-content;
-          animation: marquee 25s linear infinite;
+          animation: marquee 30s linear infinite;
         }
         .animate-marquee:hover {
           animation-play-state: paused;
