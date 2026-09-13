@@ -465,7 +465,7 @@ app.get('/api/orders', async (req, res) => {
     const { userId, role } = req.query;
     let query = `
       SELECT o.id, o.total_amount, o.status, o.created_at, 
-             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Buyer') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role, COALESCE(b.location, '') as buyer_location,
+             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Partner') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role, COALESCE(b.location, '') as buyer_location, COALESCE(b.phone, '') as buyer_phone,
              COALESCE(s.id, 0) as seller_id, COALESCE(s.name, 'Direct Admin') as seller_name, COALESCE(s.role, 'admin') as seller_role
       FROM orders o
       LEFT JOIN users b ON o.buyer_id = b.id
@@ -479,7 +479,6 @@ app.get('/api/orders', async (req, res) => {
     query += ` ORDER BY o.created_at DESC`;
     const result = await pool.query(query, params);
     
-    // Fetch items for each order so itemized PDF generation works correctly
     const ordersWithItems = await Promise.all(result.rows.map(async (order) => {
       const itemsRes = await pool.query(`
         SELECT oi.quantity, oi.unit_price, p.name, p.sku, p.gst_percent 

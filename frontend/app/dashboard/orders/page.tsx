@@ -129,7 +129,7 @@ export default function AdminOrdersPage() {
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBuyerId || orderItems.length === 0) {
-      alert('Please select a downstream stockist partner and add at least one product with quantity.');
+      alert('Please select a downstream partner and add at least one product with quantity.');
       return;
     }
 
@@ -149,7 +149,7 @@ export default function AdminOrdersPage() {
       setSelectedBuyerId('');
       setPartnerPricing([]);
       fetchOrders(currentUser.id, currentUser.role);
-      alert('Order successfully created for the selected stockist partner and synced to dashboard!');
+      alert('Order successfully created for the selected partner and synced to dashboard!');
     } catch (err) {
       console.error('Create Order Error', err);
       alert('Failed to create order.');
@@ -232,7 +232,7 @@ export default function AdminOrdersPage() {
 
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184);
-      pdf.text('Official Tax Invoice & Stockist Billing Statement', textXOffset, 30);
+      pdf.text('Official Tax Invoice & Partner Billing Statement', textXOffset, 30);
 
       // Invoice Meta
       pdf.setFont('helvetica', 'bold');
@@ -260,10 +260,10 @@ export default function AdminOrdersPage() {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text('BILLED TO (SELECTED STOCKIST / VENDOR PARTNER)', 20, 71);
+      pdf.text('BILLED TO (SELECTED PARTNER / VENDOR)', 20, 71);
       pdf.text('FULFILLED BY (UPLINE HUB)', 110, 71);
 
-      // Selected Partner Details (Super Stockist / Distributor / Shop)
+      // Selected Partner Details
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
@@ -274,7 +274,7 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(71, 85, 105);
       pdf.text(`Email: ${invoiceOrder.buyer_email || 'N/A'}`, 20, 85);
       pdf.text(`Phone: ${invoiceOrder.buyer_phone || 'N/A'}`, 20, 91);
-      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'SUPER_STOCKIST').toUpperCase()}`, 20, 97);
+      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Partner').toUpperCase()}`, 20, 97);
       pdf.text(`Territory / Location: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 103);
 
       // Seller Details
@@ -374,14 +374,14 @@ export default function AdminOrdersPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Orders & Downstream Feed</h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Portal Role: <span className="text-amber-600 font-extrabold uppercase">{currentUser?.role}</span>. Manage automated fulfillment and stockist tax invoices.
+            Portal Role: <span className="text-amber-600 font-extrabold uppercase">{currentUser?.role}</span>. Manage automated fulfillment and partner tax invoices.
           </p>
         </div>
         <button
           onClick={() => setIsCreateModalOpen(true)}
           className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Create Order for Stockist
+          <Plus className="w-4 h-4" /> Create Order for Partner
         </button>
       </div>
 
@@ -392,7 +392,7 @@ export default function AdminOrdersPage() {
           <div className="text-center py-24 space-y-3">
             <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto" />
             <p className="text-slate-600 text-xs font-bold">No orders found for your account scope.</p>
-            <p className="text-slate-400 text-[11px]">Orders placed by your downline stockist network will appear here automatically.</p>
+            <p className="text-slate-400 text-[11px]">Orders placed by your downline network will appear here automatically.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -400,7 +400,7 @@ export default function AdminOrdersPage() {
               <thead>
                 <tr className="bg-slate-50 text-slate-500 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
                   <th className="p-4">Order ID</th>
-                  <th className="p-4">Stockist Partner (Billed To)</th>
+                  <th className="p-4">Partner / Vendor (Billed To)</th>
                   <th className="p-4">Seller / Upline</th>
                   <th className="p-4">Total Amount</th>
                   <th className="p-4">Status</th>
@@ -411,7 +411,12 @@ export default function AdminOrdersPage() {
                 {orders.map((o) => (
                   <tr key={o.id} className="hover:bg-slate-50/80 transition">
                     <td className="p-4 font-mono font-bold text-amber-600">#XFP-{o.id}</td>
-                    <td className="p-4 font-bold text-slate-900">{o.buyer_name} <span className="text-[10px] text-slate-400 block">({o.buyer_role})</span></td>
+                    <td className="p-4 font-bold text-slate-900">
+                      {o.buyer_name} 
+                      <span className="text-[10px] text-slate-400 block font-normal">
+                        ({o.buyer_role?.toUpperCase()}) — {o.buyer_location || 'N/A'}
+                      </span>
+                    </td>
                     <td className="p-4 text-slate-600">{o.seller_name || 'Direct Admin'}</td>
                     <td className="p-4 font-black text-slate-900">₹{o.total_amount}</td>
                     <td className="p-4">
@@ -462,22 +467,22 @@ export default function AdminOrdersPage() {
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Create Order for Downline Stockist Partner</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Rates automatically apply per stockist pricing structure (Packet/Carton & GST).</p>
+                <h3 className="text-lg font-black text-slate-900">Create Order for Downline Partner</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Rates automatically apply per partner pricing structure (Packet/Carton & GST).</p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleCreateOrder} className="space-y-6">
               <div>
-                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Select Stockist Partner Account (e.g. Jalna, Parbhani, Sambhajinagar)</label>
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Select Downline Partner Account (Super Stockist, Distributor, Shop)</label>
                 <select
                   value={selectedBuyerId}
                   onChange={(e) => handlePartnerSelect(e.target.value)}
                   required
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition"
                 >
-                  <option value="">-- Choose Stockist Partner --</option>
+                  <option value="">-- Choose Partner / Vendor --</option>
                   {downlineUsers.map((u) => (
                     <option key={u.id} value={u.id}>{u.name} ({u.role.toUpperCase()}) — {u.location || 'Territory N/A'}</option>
                   ))}
@@ -577,7 +582,7 @@ export default function AdminOrdersPage() {
 
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Confirm & Place Stockist Order</button>
+                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Confirm & Place Order</button>
               </div>
             </form>
           </div>
@@ -595,7 +600,7 @@ export default function AdminOrdersPage() {
                 <div className="flex items-center gap-3">
                   <img src="/images/logo.png" alt="Logo" className="w-12 h-12 object-contain" />
                   <div>
-                    <h3 className="text-base font-black text-slate-900">XLLENT FOODS STOCKIST INVOICE</h3>
+                    <h3 className="text-base font-black text-slate-900">XLLENT FOODS PARTNER INVOICE</h3>
                     <p className="text-[11px] text-slate-500">Order #XFP-{invoiceOrder.id} — Billed To: {invoiceOrder.buyer_name}</p>
                   </div>
                 </div>
@@ -603,14 +608,14 @@ export default function AdminOrdersPage() {
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl space-y-2 text-xs">
-                <p><strong>Selected Stockist Partner:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
-                <p><strong>Role & Territory:</strong> {invoiceOrder.buyer_role?.toUpperCase()} — <span className="text-amber-600 font-bold">{invoiceOrder.status}</span></p>
-                <p><strong>Fulfiller Upline:</strong> {invoiceOrder.seller_name || 'Direct Admin Hub'}</p>
+                <p><strong>Selected Partner / Vendor:</strong> {invoiceOrder.buyer_name} ({invoiceOrder.buyer_email})</p>
+                <p><strong>Role & Location:</strong> {invoiceOrder.buyer_role?.toUpperCase()} — {invoiceOrder.buyer_location || 'N/A'}</p>
+                <p><strong>Status:</strong> <span className="text-amber-600 font-bold">{invoiceOrder.status}</span></p>
               </div>
             </div>
 
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
-              <span className="text-xs text-slate-500 font-medium">Download PDF invoice with SKU, price per piece, quantity, and GST breakdown.</span>
+              <span className="text-xs text-slate-500 font-medium">Download professional PDF invoice with itemized products and partner details.</span>
               <button 
                 onClick={handleDownloadPDF} 
                 disabled={isDownloading}
