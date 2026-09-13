@@ -452,6 +452,7 @@ app.get('/api/orders', async (req, res) => {
       LEFT JOIN users s ON o.seller_id = s.id
     `;
     let params = [];
+    // If user is a regular partner, restrict to their orders. If admin/superadmin, show all orders.
     if (role && role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
       query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1`;
       params.push(userId);
