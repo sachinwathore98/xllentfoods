@@ -702,11 +702,21 @@ app.put('/api/admin/enquiries/:id', async (req, res) => {
     const { id } = req.params;
     const { fullName, email, phone, roleType, location, message, status } = req.body;
     
+    // Fallback if full_name is sent as fullName or vice versa
+    const nameToSave = fullName || req.body.full_name;
+    const roleToSave = roleType || req.body.role_type;
+
     const result = await pool.query(
       `UPDATE partnership_enquiries 
-       SET full_name = $1, email = $2, phone = $3, role_type = $4, location = $5, message = $6, status = $7 
+       SET full_name = COALESCE($1, full_name), 
+           email = COALESCE($2, email), 
+           phone = COALESCE($3, phone), 
+           role_type = COALESCE($4, role_type), 
+           location = COALESCE($5, location), 
+           message = COALESCE($6, message), 
+           status = COALESCE($7, status, 'Pending') 
        WHERE id = $8 RETURNING *`,
-      [fullName, email, phone, roleType, location, message, status || 'Pending', id]
+      [nameToSave, email, phone, roleToSave, location, message, status, id]
     );
 
     if (result.rows.length === 0) {
@@ -715,7 +725,7 @@ app.put('/api/admin/enquiries/:id', async (req, res) => {
 
     res.json({ message: 'Enquiry updated successfully', enquiry: result.rows[0] });
   } catch (err) {
-    console.error('Update Enquiry Error:', err);
+    console.error('Update Enquiry Error Details:', err);
     res.status(500).json({ message: `Failed to update enquiry: ${err.message}` });
   }
 });
