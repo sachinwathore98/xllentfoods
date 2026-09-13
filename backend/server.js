@@ -840,7 +840,8 @@ app.get('/api/notifications/expiry/:userId', async (req, res) => {
   }
 });
 
-async function upgradeAdsSchema() {
+// --- DATABASE UPGRADE FOR BANNER TYPE ---
+async function upgradeAdsBannerTypeSchema() {
   try {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS advertisements (
@@ -848,15 +849,17 @@ async function upgradeAdsSchema() {
         title VARCHAR(255),
         image_url TEXT NOT NULL,
         target_url TEXT,
+        banner_type VARCHAR(50) DEFAULT 'horizontal',
         is_active BOOLEAN DEFAULT TRUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
+      ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS banner_type VARCHAR(50) DEFAULT 'horizontal';
     `);
   } catch (err) {
-    console.error("Ads Schema Upgrade Error:", err);
+    console.error("Ads Banner Type Schema Error:", err);
   }
 }
-upgradeAdsSchema();
+upgradeAdsBannerTypeSchema();
 
 app.get('/api/admin/advertisements', async (req, res) => {
   try {
@@ -869,15 +872,33 @@ app.get('/api/admin/advertisements', async (req, res) => {
 
 app.post('/api/admin/advertisements', async (req, res) => {
   try {
-    const { title, imageUrl, targetUrl } = req.body;
+    const { title, imageUrl, targetUrl, bannerType } = req.body;
     const result = await pool.query(
-      "INSERT INTO advertisements (title, image_url, target_url) VALUES ($1, $2, $3) RETURNING *",
-      [title, imageUrl, targetUrl]
+      "INSERT INTO advertisements (title, image_url, target_url, banner_type) VALUES ($1, $2, $3, $4) RETURNING *",
+      [title, imageUrl, targetUrl, bannerType || 'horizontal']
     );
     res.status(201).json({ message: 'Advertisement banner added successfully', advertisement: result.rows[0] });
   } catch (err) {
     console.error('Add Ad Error:', err);
     res.status(500).json({ message: 'Failed to add advertisement banner' });
+  }
+});
+
+app.put('/api/admin/advertisements/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { title, imageUrl, targetUrl, bannerType } = req.body;
+    const result = await pool.query(
+      `UPDATE advertisements 
+       SET title = $1, image_url = $2, target_url = $3, banner_type = $4 
+       WHERE id = $5 RETURNING *`,
+      [title, imageUrl, targetUrl, bannerType || 'horizontal', id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Advertisement not found' });
+    res.json({ message: 'Advertisement updated successfully', advertisement: result.rows[0] });
+  } catch (err) {
+    console.error('Update Ad Error:', err);
+    res.status(500).json({ message: 'Failed to update advertisement banner' });
   }
 });
 
@@ -897,40 +918,5 @@ app.get('/api/advertisements/public', async (req, res) => {
     res.json({ advertisements: result.rows });
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch public advertisements' });
-  }
-});
-// --- DATABASE UPGRADE FOR BANNER TYPE ---
-async function upgradeAdsBannerTypeSchema() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS advertisements (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(255),
-        image_url TEXT NOT NULL,
-        target_url TEXT,
-        banner_type VARCHAR(50) DEFAULT 'horizontal', -- 'horizontal' or 'vertical'
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS banner_type VARCHAR(50) DEFAULT 'horizontal';
-    `);
-  } catch (err) {
-    console.error("Ads Banner Type Schema Error:", err);
-  }
-}
-upgradeAdsBannerTypeSchema();
-
-// --- UPDATE ADVERTISEMENT CREATION ROUTE ---
-app.post('/api/admin/advertisements', async (req, res) => {
-  try {
-    const { title, imageUrl, targetUrl, bannerType } = req.body;
-    const result = await pool.query(
-      "INSERT INTO advertisements (title, image_url, target_url, banner_type) VALUES ($1, $2, $3, $4) RETURNING *",
-      [title, imageUrl, targetUrl, bannerType || 'horizontal']
-    );
-    res.status(201).json({ message: 'Advertisement banner added successfully', advertisement: result.rows[0] });
-  } catch (err) {
-    console.error('Add Ad Error:', err);
-    res.status(500).json({ message: 'Failed to add advertisement banner' });
   }
 });
