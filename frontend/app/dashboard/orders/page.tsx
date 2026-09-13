@@ -182,7 +182,6 @@ export default function AdminOrdersPage() {
       setIsDownloading(true);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
-      // Helper to load image as base64
       const getBase64Image = (url: string): Promise<string> => {
         return new Promise((resolve, reject) => {
           const img = new Image();
@@ -204,25 +203,23 @@ export default function AdminOrdersPage() {
       try {
         logoBase64 = await getBase64Image('/images/logo.png');
       } catch (e) {
-        console.warn('Could not load logo image for PDF, continuing without logo:', e);
+        console.warn('Could not load logo image for PDF:', e);
       }
 
-      // Top Decorative Accent Bar
-      pdf.setFillColor(217, 119, 6); // Amber-600
+      // Top Accent Bar
+      pdf.setFillColor(217, 119, 6);
       pdf.rect(0, 0, 210, 4, 'F');
 
-      // Main Header Background
-      pdf.setFillColor(15, 23, 42); // Slate-900
+      // Header Background
+      pdf.setFillColor(15, 23, 42);
       pdf.rect(0, 4, 210, 36, 'F');
 
-      // Draw Logo if loaded successfully
       let textXOffset = 18;
       if (logoBase64) {
         pdf.addImage(logoBase64, 'PNG', 15, 9, 24, 24);
-        textXOffset = 44; // Shift text right if logo is present
+        textXOffset = 44;
       }
 
-      // Header Brand Text
       pdf.setTextColor(255, 255, 255);
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(20);
@@ -230,14 +227,14 @@ export default function AdminOrdersPage() {
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
-      pdf.setTextColor(217, 119, 6); // Amber-600
+      pdf.setTextColor(217, 119, 6);
       pdf.text('DISTRIBUTION MANAGEMENT SYSTEM', textXOffset, 25);
 
       pdf.setFontSize(8);
-      pdf.setTextColor(148, 163, 184); // Slate-400
+      pdf.setTextColor(148, 163, 184);
       pdf.text('Official Tax Invoice & Fulfillment Receipt', textXOffset, 30);
 
-      // Invoice Meta (Right Aligned in Header)
+      // Invoice Meta
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(11);
       pdf.setTextColor(255, 255, 255);
@@ -247,67 +244,81 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(210, 215, 225);
       pdf.text(`Date: ${new Date(invoiceOrder.created_at).toLocaleDateString()}`, 192, 25, { align: 'right' });
 
-      // GSTIN Section Banner
-      pdf.setFillColor(254, 243, 199); // Amber-100
+      // GSTIN Banner
+      pdf.setFillColor(254, 243, 199);
       pdf.rect(15, 48, 180, 10, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(9);
-      pdf.setTextColor(180, 83, 9); // Amber-800
+      pdf.setTextColor(180, 83, 9);
       pdf.text('GSTIN: 27AABCX1234F1Z5', 20, 54.5);
 
-      // Billing & Fulfillment Box
-      pdf.setDrawColor(226, 232, 240); // Slate-200
-      pdf.setFillColor(248, 250, 252); // Slate-50
-      pdf.roundedRect(15, 64, 180, 36, 3, 3, 'FD');
+      // Expanded Vendor & Buyer Details Box
+      pdf.setDrawColor(226, 232, 240);
+      pdf.setFillColor(248, 250, 252);
+      pdf.roundedRect(15, 63, 180, 44, 3, 3, 'FD');
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text('BILLED TO (DOWNSTREAM PARTNER)', 20, 73);
-      pdf.text('FULFILLED BY (UPLINE)', 110, 73);
+      pdf.text('BILLED TO (VENDOR / PARTNER DETAILS)', 20, 71);
+      pdf.text('FULFILLED BY (UPLINE HUB)', 110, 71);
 
+      // Buyer Details
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
-      pdf.text(invoiceOrder.buyer_name || 'N/A', 20, 81);
-      pdf.text(invoiceOrder.seller_name || 'Xllent Foods Central Hub', 110, 81);
+      pdf.text(invoiceOrder.buyer_name || 'N/A', 20, 79);
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Email: ${invoiceOrder.buyer_email || 'N/A'}`, 20, 85);
+      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Shop').toUpperCase()}`, 20, 91);
+      pdf.text(`Location / Region: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 97);
+
+      // Seller Details
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(invoiceOrder.seller_name || 'Xllent Foods Central Hub', 110, 79);
 
       pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
+      pdf.setFontSize(8.5);
       pdf.setTextColor(71, 85, 105);
-      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Shop').toUpperCase()}`, 20, 88);
-      pdf.text(`Authorized Distribution Network`, 110, 88);
+      pdf.text(`Email: support@xllentfoods.com`, 110, 85);
+      pdf.text(`Network Role: ${(invoiceOrder.seller_role || 'Admin').toUpperCase()}`, 110, 91);
+      pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
 
       // Table Header
-      pdf.setFillColor(241, 245, 249); // Slate-100
-      pdf.rect(15, 108, 180, 10, 'F');
+      pdf.setFillColor(241, 245, 249);
+      pdf.rect(15, 114, 180, 10, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
-      pdf.text('ORDER STATUS & DETAILS', 20, 114.5);
-      pdf.text('GRAND TOTAL (INCL. GST)', 190, 114.5, { align: 'right' });
+      pdf.text('ORDER STATUS & DETAILS', 20, 120.5);
+      pdf.text('GRAND TOTAL (INCL. GST)', 190, 120.5, { align: 'right' });
 
       // Table Data Row
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
-      pdf.text((invoiceOrder.status || 'Pending').toUpperCase(), 20, 128);
+      pdf.text((invoiceOrder.status || 'Pending').toUpperCase(), 20, 134);
       
       pdf.setFontSize(13);
-      pdf.setTextColor(217, 119, 6); // Amber-600
-      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, 128, { align: 'right' });
+      pdf.setTextColor(217, 119, 6);
+      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, 134, { align: 'right' });
 
       // Divider Line
       pdf.setDrawColor(226, 232, 240);
-      pdf.line(15, 138, 195, 138);
+      pdf.line(15, 144, 195, 144);
 
-      // Terms & Footer Note
+      // Terms & Conditions
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8);
       pdf.setTextColor(148, 163, 184);
-      pdf.text('Terms & Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.', 15, 150);
+      pdf.text('Terms & Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.', 15, 156);
 
-      // Bottom Branding Footer
+      // Footer
       pdf.setFillColor(248, 250, 252);
       pdf.rect(0, 280, 210, 17, 'F');
       pdf.setFont('helvetica', 'italic');
@@ -315,7 +326,6 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(100, 116, 139);
       pdf.text('Thank you for your business partnership with Xllent Foods!', 105, 290, { align: 'center' });
 
-      // Save PDF
       pdf.save(`Xllent_Foods_Invoice_${invoiceOrder.id}.pdf`);
     } catch (err) {
       console.error('PDF generation error:', err);
