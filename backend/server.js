@@ -496,6 +496,24 @@ app.put('/api/orders/:id/status', async (req, res) => {
   }
 });
 
+// Delete Order and its associated items
+app.delete('/api/orders/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    // First delete dependent order items to satisfy foreign key constraints
+    await supabase.from('order_items').delete().eq('order_id', id);
+    
+    // Then delete the order itself
+    const { error } = await supabase.from('orders').delete().eq('id', id);
+    if (error) throw error;
+    
+    res.json({ success: true, message: 'Order successfully deleted' });
+  } catch (err) {
+    console.error('Delete Order Error:', err);
+    res.status(500).json({ error: 'Failed to delete order from database' });
+  }
+});
+
 // --- PROVISION SHOP / USER MANAGEMENT ---
 app.get('/api/admin/downline-users', async (req, res) => {
   try {
