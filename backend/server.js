@@ -58,7 +58,7 @@ async function initDatabase() {
         location VARCHAR(255),
         latitude NUMERIC(10, 8),
         longitude NUMERIC(11, 8),
-        parent_id INT REFERENCES users(id),
+        parent_id INT,
         reset_otp VARCHAR(10),
         otp_expires TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -91,7 +91,10 @@ async function initDatabase() {
         description TEXT,
         pieces_per_packet INT DEFAULT 1,
         packets_per_carton INT DEFAULT 1,
-        gst_percent NUMERIC(5,2) DEFAULT 0.00
+        gst_percent NUMERIC(5,2) DEFAULT 0.00,
+        expiry_date DATE,
+        ingredients TEXT,
+        nutritional_info TEXT
       );
 
       ALTER TABLE products ADD COLUMN IF NOT EXISTS super_stockist_price NUMERIC(10,2) DEFAULT 0;
@@ -102,16 +105,17 @@ async function initDatabase() {
       ALTER TABLE products ADD COLUMN IF NOT EXISTS pieces_per_packet INT DEFAULT 1;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS packets_per_carton INT DEFAULT 1;
       ALTER TABLE products ADD COLUMN IF NOT EXISTS gst_percent NUMERIC(5,2) DEFAULT 0.00;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date DATE;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS ingredients TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS nutritional_info TEXT;
 
       CREATE TABLE IF NOT EXISTS downline_pricing_overrides (
         id SERIAL PRIMARY KEY,
-        product_id INT REFERENCES products(id) ON DELETE CASCADE,
-        user_id INT REFERENCES users(id) ON DELETE CASCADE,
+        product_id INT,
+        user_id INT,
         custom_price NUMERIC(10,2) NOT NULL,
         CONSTRAINT unique_user_product_override UNIQUE (user_id, product_id)
       );
-
-      ALTER TABLE downline_pricing_overrides ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE CASCADE;
 
       CREATE TABLE IF NOT EXISTS partnership_enquiries (
         id SERIAL PRIMARY KEY,
@@ -129,8 +133,8 @@ async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS orders (
         id SERIAL PRIMARY KEY,
-        buyer_id INT REFERENCES users(id),
-        seller_id INT REFERENCES users(id),
+        buyer_id INT,
+        seller_id INT,
         total_amount NUMERIC(10,2) NOT NULL,
         status VARCHAR(50) DEFAULT 'Pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -138,14 +142,25 @@ async function initDatabase() {
 
       CREATE TABLE IF NOT EXISTS order_items (
         id SERIAL PRIMARY KEY,
-        order_id INT REFERENCES orders(id) ON DELETE CASCADE,
-        product_id INT REFERENCES products(id),
+        order_id INT,
+        product_id INT,
         quantity INT NOT NULL,
         unit_price NUMERIC(10,2) NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS advertisements (
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255),
+        image_url TEXT NOT NULL,
+        target_url TEXT,
+        banner_type VARCHAR(50) DEFAULT 'horizontal',
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+
+      ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS banner_type VARCHAR(50) DEFAULT 'horizontal';
     `);
 
-    // Seed default superadmin if not exists
     const adminCheck = await pool.query("SELECT * FROM users WHERE role = 'superadmin'");
     if (adminCheck.rows.length === 0) {
       const hashedPassword = await bcrypt.hash('Admin@123', 10);
@@ -153,10 +168,8 @@ async function initDatabase() {
         "INSERT INTO users (name, email, password, role, phone) VALUES ($1, $2, $3, $4, $5)",
         ['Super Admin', 'superadmin@xllentfoods.com', hashedPassword, 'superadmin', '9999999999']
       );
-      console.log('Default SuperAdmin seeded: superadmin@xllentfoods.com / Admin@123');
     }
 
-    // Seed default categories
     const catCheck = await pool.query("SELECT * FROM categories");
     if (catCheck.rows.length === 0) {
       const defaultCategories = ['Confectionery', 'Snacks', 'Namkeen', 'Candies', 'Dry Fruits', 'Biscuits', 'Cookies', 'Chikki', 'Chocolate', 'Sweets', 'Toffees'];
@@ -170,42 +183,12 @@ async function initDatabase() {
 }
 initDatabase();
 
-// --- BREVO EMAIL UTILITY ---
-const sendOTPEmail = async (toEmail, otpCode, recipientName = 'Partner') => {
-  const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-  apiInstance.setApiKey(SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey, process.env.BREVO_API_KEY);
-
-  const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
-  sendSmtpEmail.sender = { email: process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com', name: "Xllent Foods" };
-  sendSmtpEmail.to = [{ email: toEmail, name: recipientName }];
-  sendSmtpEmail.subject = "Your Verification Code - Xllent Foods DMS";
-  sendSmtpEmail.htmlContent = `
-    <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
-      <h2 style="color: #d97706; text-align: center;">Xllent Foods</h2>
-      <p>Hello <b>${recipientName}</b>,</p>
-      <p>You requested an OTP for password recovery on the Xllent Foods Distribution Management System.</p>
-      <div style="text-align: center; margin: 30px 0;">
-        <span style="font-size: 32px; font-weight: bold; background: #fef3c7; color: #b45309; padding: 12px 24px; letter-spacing: 6px; border-radius: 8px; display: inline-block;">${otpCode}</span>
-      </div>
-      <p>This code is valid for 10 minutes. Do not share this code with anyone.</p>
-    </div>
-  `;
-
-  try {
-    await apiInstance.sendTransacEmail(sendSmtpEmail);
-    return true;
-  } catch (error) {
-    console.error("Brevo Email Error:", error);
-    throw new Error("Failed to send OTP email via Brevo");
-  }
-};
-
-// --- HEALTH CHECK ROUTE ---
+// --- HEALTH CHECK ---
 app.get('/', (req, res) => {
   res.status(200).json({ status: 'online', service: 'Xllent Foods DMS Backend' });
 });
 
-// --- AUTH & USER PROVISIONING ---
+// --- AUTH & LOGIN ---
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -229,30 +212,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-app.post('/api/admin/users/create', async (req, res) => {
-  try {
-    const { name, email, password, role, phone, location, latitude, longitude, parentId } = req.body;
-    
-    const existing = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
-    if (existing.rows.length > 0) {
-      return res.status(400).json({ message: 'User with this email already exists.' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password || 'Admin@123', 10);
-    const result = await pool.query(
-      `INSERT INTO users (name, email, password, role, phone, location, latitude, longitude, parent_id) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, name, email, role`,
-      [name, email, hashedPassword, role, phone, location, latitude || null, longitude || null, parentId || null]
-    );
-
-    res.status(201).json({ message: 'User provisioned successfully', user: result.rows[0] });
-  } catch (err) {
-    console.error('User Creation Error:', err);
-    res.status(500).json({ message: 'Server error during user creation' });
-  }
-});
-
-// --- FINANCIAL OVERVIEW METRICS ROUTE ---
+// --- OVERVIEW / FINANCIAL METRICS ---
 app.get('/api/admin/financial-overview', async (req, res) => {
   try {
     const productStats = await pool.query("SELECT COUNT(*) as total_products, SUM(mrp) as total_mrp_value FROM products");
@@ -275,13 +235,12 @@ app.get('/api/admin/financial-overview', async (req, res) => {
   }
 });
 
-// --- CATEGORY & PRODUCT MANAGEMENT ---
+// --- INVENTORY & CATALOG (Products & Categories) ---
 app.get('/api/categories', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM categories ORDER BY name ASC");
     res.json({ categories: result.rows });
   } catch (err) {
-    console.error('Fetch Categories Error:', err);
     res.status(500).json({ message: 'Failed to fetch categories' });
   }
 });
@@ -301,85 +260,52 @@ app.get('/api/admin/products', async (req, res) => {
     const { category } = req.query;
     let query = "SELECT * FROM products";
     let params = [];
-
     if (category && category !== 'All') {
       query += " WHERE category = $1";
       params.push(category);
     }
-
     let result = await pool.query(query, params);
     res.json({ products: result.rows });
   } catch (err) {
-    console.error('Server error loading products:', err);
     res.status(500).json({ message: 'Server error loading products' });
   }
 });
 
 app.get('/api/products/public', async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM products");
+    const result = await pool.query("SELECT * FROM products ORDER BY name ASC");
     res.json({ products: result.rows });
   } catch (err) {
-    console.error('Fetch Public Products Error:', err);
-    res.status(500).json({ message: 'Server error loading products' });
+    res.status(500).json({ message: 'Failed to load products' });
   }
 });
 
 app.post('/api/admin/products', async (req, res) => {
   try {
-    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description, piecesPerPacket, packetsPerCarton, gstPercent } = req.body;
+    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description, piecesPerPacket, packetsPerCarton, gstPercent, expiryDate } = req.body;
     const result = await pool.query(
-      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image, description, pieces_per_packet, packets_per_carton, gst_percent) 
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING *`,
-      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, piecesPerPacket || 1, packetsPerCarton || 1, gstPercent || 0]
+      `INSERT INTO products (name, category, sku, mrp, super_stockist_price, distributor_price, shop_price, status, image, description, pieces_per_packet, packets_per_carton, gst_percent, expiry_date) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, piecesPerPacket || 1, packetsPerCarton || 1, gstPercent || 0, expiryDate || null]
     );
-    res.status(201).json({ message: 'Product added successfully with GST and packaging metrics', product: result.rows[0] });
+    res.status(201).json({ message: 'Product added successfully', product: result.rows[0] });
   } catch (err) {
-    console.error('Add Product Error:', err);
     res.status(500).json({ message: 'Failed to add product' });
-  }
-});
-
-app.put('/api/admin/categories/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name } = req.body;
-    const result = await pool.query("UPDATE categories SET name = $1 WHERE id = $2 RETURNING *", [name, id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Category not found' });
-    res.json({ message: 'Category updated successfully', category: result.rows[0] });
-  } catch (err) {
-    console.error('Update Category Error:', err);
-    res.status(500).json({ message: 'Failed to update category' });
   }
 });
 
 app.put('/api/admin/products/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description, piecesPerPacket, packetsPerCarton, gstPercent } = req.body;
+    const { name, category, sku, mrp, superStockistPrice, distributorPrice, shopPrice, status, image, description, piecesPerPacket, packetsPerCarton, gstPercent, expiryDate } = req.body;
     const result = await pool.query(
-      `UPDATE products 
-       SET name = $1, category = $2, sku = $3, mrp = $4, super_stockist_price = $5, distributor_price = $6, shop_price = $7, status = $8, image = $9, description = $10, pieces_per_packet = $11, packets_per_carton = $12, gst_percent = $13 
-       WHERE id = $14 RETURNING *`,
-      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, piecesPerPacket || 1, packetsPerCarton || 1, gstPercent || 0, id]
+      `UPDATE products SET name = $1, category = $2, sku = $3, mrp = $4, super_stockist_price = $5, distributor_price = $6, shop_price = $7, status = $8, image = $9, description = $10, pieces_per_packet = $11, packets_per_carton = $12, gst_percent = $13, expiry_date = $14 WHERE id = $15 RETURNING *`,
+      [name, category, sku, mrp, superStockistPrice || 0, distributorPrice || 0, shopPrice || 0, status || 'In Stock', image, description, piecesPerPacket || 1, packetsPerCarton || 1, gstPercent || 0, expiryDate || null, id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Product not found' });
     res.json({ message: 'Product updated successfully', product: result.rows[0] });
   } catch (err) {
-    console.error('Update Product Error:', err);
     res.status(500).json({ message: 'Failed to update product' });
-  }
-});
-
-app.delete('/api/admin/categories/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query("DELETE FROM categories WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Category not found' });
-    res.json({ message: 'Category deleted successfully' });
-  } catch (err) {
-    console.error('Delete Category Error:', err);
-    res.status(500).json({ message: 'Failed to delete category' });
   }
 });
 
@@ -390,21 +316,11 @@ app.delete('/api/admin/products/:id', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ message: 'Product not found' });
     res.json({ message: 'Product deleted successfully' });
   } catch (err) {
-    console.error('Delete Product Error:', err);
     res.status(500).json({ message: 'Failed to delete product' });
   }
 });
 
-app.get('/api/admin/users-list', async (req, res) => {
-  try {
-    const result = await pool.query("SELECT id, name, email, role, location FROM users WHERE role != 'superadmin' ORDER BY role, name ASC");
-    res.json({ users: result.rows });
-  } catch (err) {
-    console.error('Fetch Users List Error:', err);
-    res.status(500).json({ message: 'Failed to fetch users list' });
-  }
-});
-
+// --- DOWNLINE PRICING ---
 app.get('/api/downline-pricing/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
@@ -428,7 +344,6 @@ app.get('/api/downline-pricing/:userId', async (req, res) => {
     `, [userId]);
     res.json({ pricing: result.rows });
   } catch (err) {
-    console.error('Fetch User Pricing Error:', err);
     res.status(500).json({ message: 'Failed to fetch user pricing' });
   }
 });
@@ -436,71 +351,100 @@ app.get('/api/downline-pricing/:userId', async (req, res) => {
 app.post('/api/downline-pricing/set-user-price', async (req, res) => {
   try {
     const { userId, productId, customPrice } = req.body;
-    
-    if (!userId || !productId || customPrice === undefined) {
-      return res.status(400).json({ message: 'Missing required parameters' });
-    }
-
-    // Safe Update-then-Insert logic with unique constraint fallback
     const updateRes = await pool.query(`
-      UPDATE downline_pricing_overrides 
-      SET custom_price = $1 
-      WHERE user_id = $2 AND product_id = $3
-      RETURNING *
+      UPDATE downline_pricing_overrides SET custom_price = $1 WHERE user_id = $2 AND product_id = $3 RETURNING *
     `, [customPrice, userId, productId]);
 
     if (updateRes.rows.length === 0) {
       await pool.query(`
-        INSERT INTO downline_pricing_overrides (user_id, product_id, custom_price)
-        VALUES ($1, $2, $3)
+        INSERT INTO downline_pricing_overrides (user_id, product_id, custom_price) VALUES ($1, $2, $3)
       `, [userId, productId, customPrice]);
     }
-
-    res.json({ message: 'User-specific product pricing successfully updated' });
+    res.json({ message: 'User pricing updated successfully' });
   } catch (err) {
-    console.error('User Pricing Override Error:', err);
-    res.status(500).json({ message: `Failed to update pricing: ${err.message}` });
+    res.status(500).json({ message: 'Failed to update pricing' });
   }
 });
 
-// --- SMART HIERARCHY ORDERS ROUTE ---
+// --- PARTNERSHIP ENQUIRIES ---
+app.get('/api/admin/enquiries', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM partnership_enquiries ORDER BY created_at DESC");
+    res.json({ enquiries: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch enquiries' });
+  }
+});
+
+app.post('/api/partnership/enquiry', async (req, res) => {
+  try {
+    const { fullName, email, phone, roleType, location, message } = req.body;
+    await pool.query(
+      `INSERT INTO partnership_enquiries (full_name, email, phone, role_type, location, message) VALUES ($1, $2, $3, $4, $5, $6)`,
+      [fullName, email, phone, roleType, location, message]
+    );
+    res.status(201).json({ message: 'Enquiry submitted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to submit enquiry' });
+  }
+});
+
+app.put('/api/admin/enquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const result = await pool.query("UPDATE partnership_enquiries SET status = COALESCE($1, status) WHERE id = $2 RETURNING *", [status, id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Enquiry not found' });
+    res.json({ message: 'Enquiry updated successfully', enquiry: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to update enquiry' });
+  }
+});
+
+app.delete('/api/admin/enquiries/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM partnership_enquiries WHERE id = $1", [id]);
+    res.json({ message: 'Enquiry deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete enquiry' });
+  }
+});
+
+// --- SMART ORDERS & FULFILLMENT ---
 app.post('/api/orders/smart', async (req, res) => {
   try {
     const { buyerId, items, totalAmount, proxyForId } = req.body;
-
     const actualBuyerId = proxyForId || buyerId;
     const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [actualBuyerId]);
     if (buyerRes.rows.length === 0) return res.status(404).json({ message: 'Buyer not found' });
     const buyer = buyerRes.rows[0];
 
-    let targetSellerId = buyer.parent_id;
-
+    let targetSellerId = buyer.parent_id || null;
     if (!targetSellerId) {
       if (buyer.role === 'shop') {
         const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-        if (ssQuery.rows.length > 0) {
-          targetSellerId = ssQuery.rows[0].id;
-        } else {
+        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+        else {
           const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
           if (distQuery.rows.length > 0) targetSellerId = distQuery.rows[0].id;
         }
       } else if (buyer.role === 'distributor') {
         const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-        if (ssQuery.rows.length > 0) {
-          targetSellerId = ssQuery.rows[0].id;
-        } else {
-          const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin', 'superadmin@xllentfoods.com') LIMIT 1");
+        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+        else {
+          const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
           if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
         }
       } else if (buyer.role === 'super_stockist') {
-        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin', 'superadmin@xllentfoods.com') LIMIT 1");
+        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
         if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
       }
     }
 
     const orderResult = await pool.query(
       "INSERT INTO orders (buyer_id, seller_id, total_amount, status) VALUES ($1, $2, $3, $4) RETURNING id",
-      [actualBuyerId, targetSellerId || null, totalAmount, 'Pending']
+      [actualBuyerId, targetSellerId, totalAmount, 'Pending']
     );
     const orderId = orderResult.rows[0].id;
 
@@ -511,40 +455,33 @@ app.post('/api/orders/smart', async (req, res) => {
       );
     }
 
-    res.status(201).json({ message: 'Order routed successfully through supply chain hierarchy', orderId, assignedSellerId: targetSellerId });
+    res.status(201).json({ message: 'Order routed successfully', orderId, assignedSellerId: targetSellerId });
   } catch (err) {
-    console.error('Smart Order Error Details:', err);
     res.status(500).json({ message: `Failed to place smart order: ${err.message}` });
   }
 });
 
-// --- FETCH HIERARCHY SCOPED ORDERS ROUTE ---
 app.get('/api/orders', async (req, res) => {
   try {
     const { userId, role } = req.query;
-
     let query = `
       SELECT o.id, o.total_amount, o.status, o.created_at, 
-             b.id as buyer_id, b.name as buyer_name, b.email as buyer_email, b.role as buyer_role,
-             s.id as seller_id, s.name as seller_name, s.role as seller_role
+             COALESCE(b.id, 0) as buyer_id, COALESCE(b.name, 'Unknown Buyer') as buyer_name, COALESCE(b.email, '') as buyer_email, COALESCE(b.role, 'shop') as buyer_role,
+             COALESCE(s.id, 0) as seller_id, COALESCE(s.name, 'Direct Admin') as seller_name, COALESCE(s.role, 'admin') as seller_role
       FROM orders o
-      JOIN users b ON o.buyer_id = b.id
+      LEFT JOIN users b ON o.buyer_id = b.id
       LEFT JOIN users s ON o.seller_id = s.id
     `;
-
     let params = [];
-    if (role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
-      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1 OR b.parent_id = $1`;
+    if (role && role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
+      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1`;
       params.push(userId);
     }
-
     query += ` ORDER BY o.created_at DESC`;
-
     const result = await pool.query(query, params);
     res.json({ orders: result.rows });
   } catch (err) {
-    console.error('Failed to fetch orders:', err);
-    res.status(500).json({ message: 'Failed to fetch orders' });
+    res.status(500).json({ message: `Failed to fetch orders: ${err.message}` });
   }
 });
 
@@ -552,266 +489,69 @@ app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-
     await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
     res.json({ message: 'Order status updated successfully' });
   } catch (err) {
-    console.error('Failed to update order status:', err);
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
 
-// --- FETCH DOWNLINE USERS SCOPED BY PARENT ID ---
+// --- PROVISION SHOP / USER MANAGEMENT ---
 app.get('/api/admin/downline-users', async (req, res) => {
   try {
     const { userId, role } = req.query;
-
     if (role === 'admin' || role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
       const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
       return res.json({ users: result.rows });
     }
-
     const result = await pool.query(`
       WITH RECURSIVE downline AS (
-        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1 AND role != 'employee'
+        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1
         UNION
         SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
         JOIN downline d ON u.parent_id = d.id
-        WHERE u.role != 'employee'
       )
       SELECT * FROM downline ORDER BY role, name ASC
     `, [userId]);
-
     res.json({ users: result.rows });
   } catch (err) {
-    console.error('Fetch Downline Users Error:', err);
     res.status(500).json({ message: 'Failed to fetch downline users' });
   }
 });
 
-// --- UPDATE DOWNLINE USER DETAILS & PASSWORD ---
+app.post('/api/admin/users/create', async (req, res) => {
+  try {
+    const { name, email, password, role, phone, location, parentId } = req.body;
+    const existing = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+    if (existing.rows.length > 0) return res.status(400).json({ message: 'User already exists.' });
+
+    const hashedPassword = await bcrypt.hash(password || 'Admin@123', 10);
+    const result = await pool.query(
+      `INSERT INTO users (name, email, password, role, phone, location, parent_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, name, email, role`,
+      [name, email, hashedPassword, role, phone, location, parentId || null]
+    );
+    res.status(201).json({ message: 'User provisioned successfully', user: result.rows[0] });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error during user creation' });
+  }
+});
+
 app.put('/api/admin/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const { name, email, phone, location, password } = req.body;
-
     if (password && password.trim() !== '') {
       const hashedPassword = await bcrypt.hash(password, 10);
-      const result = await pool.query(
-        `UPDATE users SET name = $1, email = $2, phone = $3, location = $4, password = $5 WHERE id = $6 RETURNING id, name, email, role`,
-        [name, email, phone, location, hashedPassword, id]
-      );
+      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4, password = $5 WHERE id = $6 RETURNING id, name, email, role`, [name, email, phone, location, hashedPassword, id]);
       if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-      return res.json({ message: 'User profile and password updated successfully', user: result.rows[0] });
+      return res.json({ message: 'User updated successfully', user: result.rows[0] });
     } else {
-      const result = await pool.query(
-        `UPDATE users SET name = $1, email = $2, phone = $3, location = $4 WHERE id = $5 RETURNING id, name, email, role`,
-        [name, email, phone, location, id]
-      );
+      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4 WHERE id = $5 RETURNING id, name, email, role`, [name, email, phone, location, id]);
       if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-      return res.json({ message: 'User profile updated successfully', user: result.rows[0] });
+      return res.json({ message: 'User updated successfully', user: result.rows[0] });
     }
   } catch (err) {
-    console.error('Update User Error:', err);
     res.status(500).json({ message: 'Failed to update user' });
-  }
-});
-
-// --- PARTNERSHIP ENQUIRY FORM ENDPOINT ---
-const handlePartnershipEnquiry = async (req, res) => {
-  try {
-    const { fullName, email, phone, roleType, location, message } = req.body;
-
-    await pool.query(
-      `INSERT INTO partnership_enquiries (full_name, email, phone, role_type, location, message) 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
-      [fullName, email, phone, roleType, location, message]
-    );
-
-    try {
-      if (process.env.BREVO_API_KEY) {
-        const { BrevoClient } = require('@getbrevo/brevo');
-        const brevo = new BrevoClient({ apiKey: process.env.BREVO_API_KEY });
-        const senderEmail = process.env.SENDER_EMAIL || 'xllentfoods91@gmail.com';
-
-        await brevo.transactionalEmails.sendTransacEmail({
-          sender: { email: senderEmail, name: "Xllent Foods Portal" },
-          to: [{ email: senderEmail, name: "Admin" }],
-          subject: `New Partnership Enquiry: ${roleType} - ${fullName}`,
-          htmlContent: `
-            <div style="font-family: Arial, sans-serif; padding: 20px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 10px;">
-              <h2 style="color: #d97706; text-align: center;">New Partnership Application</h2>
-              <p>You have received a new partnership enquiry from your public website:</p>
-              <ul style="line-height: 1.6; background: #f8fafc; padding: 15px 25px; border-radius: 8px;">
-                <li><b>Full Name:</b> ${fullName}</li>
-                <li><b>Email:</b> ${email}</li>
-                <li><b>Phone:</b> ${phone}</li>
-                <li><b>Role Requested:</b> ${roleType}</li>
-                <li><b>Location:</b> ${location}</li>
-                <li><b>Message:</b> ${message || 'N/A'}</li>
-              </ul>
-            </div>
-          `
-        });
-
-        await brevo.transactionalEmails.sendTransacEmail({
-          sender: { email: senderEmail, name: "Xllent Foods" },
-          to: [{ email: email, name: fullName }],
-          subject: "Welcome to Xllent Foods – Partnership Enquiry Received!",
-          htmlContent: `
-            <div style="font-family: Arial, sans-serif; padding: 25px; color: #333; max-width: 600px; margin: auto; border: 1px solid #e2e8f0; border-radius: 12px; background: #ffffff;">
-              <div style="text-align: center; margin-bottom: 20px;">
-                <h2 style="color: #d97706; margin: 0;">Xllent Foods</h2>
-                <p style="font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px;">Distribution Management System</p>
-              </div>
-              <p>Dear <b>${fullName}</b>,</p>
-              <p>Thank you for your interest in partnering with <b>Xllent Foods</b> as a <b>${roleType}</b> for the <b>${location}</b> region.</p>
-              <p>We have successfully received your application details. Our regional expansion team is currently reviewing your submission.</p>
-            </div>
-          `
-        });
-      }
-    } catch (emailErr) {
-      console.error("Brevo Email Warning (Enquiry saved to DB):", emailErr.message || emailErr);
-    }
-
-    res.status(201).json({ message: 'Enquiry submitted successfully! Our team will contact you shortly.' });
-  } catch (err) {
-    console.error('Partnership Enquiry Error:', err);
-    res.status(500).json({ message: 'Failed to submit enquiry. Please try again.' });
-  }
-};
-
-app.post('/api/partnership/enquiry', handlePartnershipEnquiry);
-app.post('/partnership/enquiry', handlePartnershipEnquiry);
-
-// --- ERROR HANDLING MIDDLEWARE ---
-app.use((err, req, res, next) => {
-  console.error('Unhandled Express Error:', err.stack);
-  res.status(500).json({ message: 'Internal server error occurred.' });
-});
-
-// --- SERVER LISTENER ---
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
-
-// --- PARTNERSHIP ENQUIRIES MANAGEMENT ---
-app.get('/api/admin/enquiries', async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM partnership_enquiries ORDER BY created_at DESC");
-    res.json({ enquiries: result.rows });
-  } catch (err) {
-    console.error('Fetch Enquiries Error:', err);
-    res.status(500).json({ message: 'Failed to fetch partnership enquiries' });
-  }
-});
-
-app.put('/api/admin/enquiries/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { fullName, email, phone, roleType, location, message, status } = req.body;
-    
-    const nameToSave = fullName || req.body.full_name;
-    const roleToSave = roleType || req.body.role_type;
-
-    const result = await pool.query(
-      `UPDATE partnership_enquiries 
-       SET full_name = COALESCE($1, full_name), 
-           email = COALESCE($2, email), 
-           phone = COALESCE($3, phone), 
-           role_type = COALESCE($4, role_type), 
-           location = COALESCE($5, location), 
-           message = COALESCE($6, message), 
-           status = COALESCE($7, status, 'Pending') 
-       WHERE id = $8 RETURNING *`,
-      [nameToSave, email, phone, roleToSave, location, message, status, id]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Enquiry not found' });
-    }
-
-    res.json({ message: 'Enquiry updated successfully', enquiry: result.rows[0] });
-  } catch (err) {
-    console.error('Update Enquiry Error Details:', err);
-    res.status(500).json({ message: `Failed to update enquiry: ${err.message}` });
-  }
-});
-
-app.delete('/api/admin/enquiries/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const result = await pool.query("DELETE FROM partnership_enquiries WHERE id = $1 RETURNING *", [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: 'Enquiry not found' });
-    res.json({ message: 'Enquiry deleted successfully' });
-  } catch (err) {
-    console.error('Delete Enquiry Error:', err);
-    res.status(500).json({ message: 'Failed to delete enquiry' });
-  }
-});
-
-async function upgradeEnquiriesTable() {
-  try {
-    await pool.query("ALTER TABLE partnership_enquiries ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'Pending'");
-  } catch (e) {
-    console.error("Migration error:", e);
-  }
-}
-upgradeEnquiriesTable();
-
-app.get('/api/admin/downline-users', async (req, res) => {
-  try {
-    const { userId, role } = req.query;
-
-    if (role === 'admin' || role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
-      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
-      return res.json({ users: result.rows });
-    }
-
-    const result = await pool.query(`
-      WITH RECURSIVE downline AS (
-        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1 AND role != 'employee'
-        UNION
-        SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
-        JOIN downline d ON u.parent_id = d.id
-        WHERE u.role != 'employee'
-      )
-      SELECT * FROM downline ORDER BY role, name ASC
-    `, [userId]);
-
-    res.json({ users: result.rows });
-  } catch (err) {
-    console.error('Fetch Downline Users Error:', err);
-    res.status(500).json({ message: 'Failed to fetch downline users' });
-  }
-});
-
-app.get('/api/orders', async (req, res) => {
-  try {
-    const { userId, role } = req.query;
-
-    let query = `
-      SELECT o.id, o.total_amount, o.status, o.created_at, 
-             b.id as buyer_id, b.name as buyer_name, b.email as buyer_email, b.role as buyer_role,
-             s.id as seller_id, s.name as seller_name, s.role as seller_role
-      FROM orders o
-      JOIN users b ON o.buyer_id = b.id
-      LEFT JOIN users s ON o.seller_id = s.id
-    `;
-
-    let params = [];
-    if (role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
-      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1 OR b.parent_id = $1`;
-      params.push(userId);
-    }
-
-    query += ` ORDER BY o.created_at DESC`;
-
-    const result = await pool.query(query, params);
-    res.json({ orders: result.rows });
-  } catch (err) {
-    console.error('Failed to fetch orders:', err);
-    res.status(500).json({ message: 'Failed to fetch orders' });
   }
 });
 
@@ -820,85 +560,13 @@ app.delete('/api/admin/users/:id', async (req, res) => {
     const { id } = req.params;
     const result = await pool.query("DELETE FROM users WHERE id = $1 RETURNING *", [id]);
     if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
-    res.json({ message: 'User account deleted successfully' });
+    res.json({ message: 'User deleted successfully' });
   } catch (err) {
-    console.error('Delete User Error:', err);
-    res.status(500).json({ message: 'Failed to delete user account' });
+    res.status(500).json({ message: 'Failed to delete user' });
   }
 });
 
-async function upgradeSystemSchema() {
-  try {
-    await pool.query(`
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS expiry_date DATE;
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS ingredients TEXT;
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS nutritional_info TEXT;
-      ALTER TABLE products ADD COLUMN IF NOT EXISTS gst_percent NUMERIC(5,2) DEFAULT 0.00;
-
-      CREATE TABLE IF NOT EXISTS order_discounts (
-        id SERIAL PRIMARY KEY,
-        order_id INT REFERENCES orders(id) ON DELETE CASCADE,
-        discount_type VARCHAR(50),
-        discount_value NUMERIC(10,2) DEFAULT 0,
-        waver_amount NUMERIC(10,2) DEFAULT 0,
-        bonus_items TEXT
-      );
-
-      CREATE TABLE IF NOT EXISTS partner_discounts (
-        id SERIAL PRIMARY KEY,
-        user_id INT REFERENCES users(id) ON DELETE CASCADE,
-        downstream_id INT REFERENCES users(id) ON DELETE CASCADE,
-        discount_percentage NUMERIC(5,2) DEFAULT 0,
-        flat_discount NUMERIC(10,2) DEFAULT 0,
-        min_billing_threshold NUMERIC(10,2) DEFAULT 0,
-        bonus_product_id INT REFERENCES products(id),
-        UNIQUE(user_id, downstream_id)
-      );
-    `);
-  } catch (err) {
-    console.error("Schema Upgrade Error:", err);
-  }
-}
-upgradeSystemSchema();
-
-app.get('/api/notifications/expiry/:userId', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const result = await pool.query(`
-      SELECT id, name, sku, expiry_date, 
-             (expiry_date - CURRENT_DATE) as days_remaining
-      FROM products
-      WHERE expiry_date IS NOT NULL AND expiry_date <= CURRENT_DATE + INTERVAL '15 days'
-      ORDER BY expiry_date ASC
-    `);
-    res.json({ alerts: result.rows });
-  } catch (err) {
-    console.error('Expiry Notification Error:', err);
-    res.status(500).json({ message: 'Failed to fetch expiry notifications' });
-  }
-});
-
-// --- DATABASE UPGRADE FOR BANNER TYPE ---
-async function upgradeAdsBannerTypeSchema() {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS advertisements (
-        id SERIAL PRIMARY KEY,
-        title VARCHAR(255),
-        image_url TEXT NOT NULL,
-        target_url TEXT,
-        banner_type VARCHAR(50) DEFAULT 'horizontal',
-        is_active BOOLEAN DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      ALTER TABLE advertisements ADD COLUMN IF NOT EXISTS banner_type VARCHAR(50) DEFAULT 'horizontal';
-    `);
-  } catch (err) {
-    console.error("Ads Banner Type Schema Error:", err);
-  }
-}
-upgradeAdsBannerTypeSchema();
-
+// --- ADVERTISEMENT BANNERS ---
 app.get('/api/admin/advertisements', async (req, res) => {
   try {
     const result = await pool.query("SELECT * FROM advertisements ORDER BY created_at DESC");
@@ -915,10 +583,9 @@ app.post('/api/admin/advertisements', async (req, res) => {
       "INSERT INTO advertisements (title, image_url, target_url, banner_type) VALUES ($1, $2, $3, $4) RETURNING *",
       [title, imageUrl, targetUrl, bannerType || 'horizontal']
     );
-    res.status(201).json({ message: 'Advertisement banner added successfully', advertisement: result.rows[0] });
+    res.status(201).json({ message: 'Advertisement added successfully', advertisement: result.rows[0] });
   } catch (err) {
-    console.error('Add Ad Error:', err);
-    res.status(500).json({ message: 'Failed to add advertisement banner' });
+    res.status(500).json({ message: 'Failed to add advertisement' });
   }
 });
 
@@ -927,16 +594,41 @@ app.put('/api/admin/advertisements/:id', async (req, res) => {
     const { id } = req.params;
     const { title, imageUrl, targetUrl, bannerType } = req.body;
     const result = await pool.query(
-      `UPDATE advertisements 
-       SET title = $1, image_url = $2, target_url = $3, banner_type = $4 
-       WHERE id = $5 RETURNING *`,
+      `UPDATE advertisements SET title = $1, image_url = $2, target_url = $3, banner_type = $4 WHERE id = $5 RETURNING *`,
       [title, imageUrl, targetUrl, bannerType || 'horizontal', id]
     );
     if (result.rows.length === 0) return res.status(404).json({ message: 'Advertisement not found' });
     res.json({ message: 'Advertisement updated successfully', advertisement: result.rows[0] });
   } catch (err) {
-    console.error('Update Ad Error:', err);
-    res.status(500).json({ message: 'Failed to update advertisement banner' });
+    res.status(500).json({ message: 'Failed to update advertisement' });
   }
 });
 
+app.delete('/api/admin/advertisements/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    await pool.query("DELETE FROM advertisements WHERE id = $1", [id]);
+    res.json({ message: 'Advertisement deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to delete advertisement' });
+  }
+});
+
+app.get('/api/advertisements/public', async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM advertisements WHERE is_active = TRUE ORDER BY created_at DESC");
+    res.json({ advertisements: result.rows });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch public advertisements' });
+  }
+});
+
+// --- ERROR HANDLING MIDDLEWARE ---
+app.use((err, req, res, next) => {
+  console.error('Unhandled Express Error:', err.stack);
+  res.status(500).json({ message: 'Internal server error occurred.' });
+});
+
+// --- SERVER LISTENER ---
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
