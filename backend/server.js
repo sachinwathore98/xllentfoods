@@ -462,36 +462,7 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
   }
 });
 
-// --- SCOPED HIERARCHY ORDERS ROUTE ---
-app.get('/api/orders', async (req, res) => {
-  try {
-    const { userId, role } = req.query;
-
-    let query = `
-      SELECT o.id, o.total_amount, o.status, o.created_at, 
-             b.name as buyer_name, b.email as buyer_email, b.role as buyer_role,
-             s.name as seller_name, s.role as seller_role
-      FROM orders o
-      JOIN users b ON o.buyer_id = b.id
-      LEFT JOIN users s ON o.seller_id = s.id
-    `;
-
-    let params = [];
-    if (role && role !== 'admin' && role !== 'superadmin') {
-      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1`;
-      params.push(userId);
-    }
-
-    query += ` ORDER BY o.created_at DESC`;
-
-    const result = await pool.query(query, params);
-    res.json({ orders: result.rows });
-  } catch (err) {
-    console.error('Failed to fetch orders:', err);
-    res.status(500).json({ message: 'Failed to fetch orders' });
-  }
-});
-
+// --- SMART HIERARCHY ORDERS ROUTE ---
 app.post('/api/orders/smart', async (req, res) => {
   try {
     const { buyerId, items, totalAmount, proxyForId } = req.body;
@@ -503,20 +474,26 @@ app.post('/api/orders/smart', async (req, res) => {
 
     let targetSellerId = buyer.parent_id;
 
+    // Intelligent Fallback Hierarchy Routing: Super Stockist first, fallback to Distributor
     if (!targetSellerId) {
       if (buyer.role === 'shop') {
-        const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
-        if (distQuery.rows.length > 0) {
-          targetSellerId = distQuery.rows[0].id;
+        const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
+        if (ssQuery.rows.length > 0) {
+          targetSellerId = ssQuery.rows[0].id;
         } else {
-          const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-          if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+          const distQuery = await pool.query("SELECT id FROM users WHERE role = 'distributor' LIMIT 1");
+          if (distQuery.rows.length > 0) targetSellerId = distQuery.rows[0].id;
         }
       } else if (buyer.role === 'distributor') {
         const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
-        if (ssQuery.rows.length > 0) targetSellerId = ssQuery.rows[0].id;
+        if (ssQuery.rows.length > 0) {
+          targetSellerId = ssQuery.rows[0].id;
+        } else {
+          const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin', 'superadmin@xllentfoods.com') LIMIT 1");
+          if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
+        }
       } else if (buyer.role === 'super_stockist') {
-        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin') LIMIT 1");
+        const adminQuery = await pool.query("SELECT id FROM users WHERE role IN ('admin', 'superadmin', 'superadmin@xllentfoods.com') LIMIT 1");
         if (adminQuery.rows.length > 0) targetSellerId = adminQuery.rows[0].id;
       }
     }
@@ -541,6 +518,36 @@ app.post('/api/orders/smart', async (req, res) => {
   }
 });
 
+// --- FETCH HIERARCHY SCOPED ORDERS ROUTE ---
+app.get('/api/orders', async (req, res) => {
+  try {
+    const { userId, role } = req.query;
+
+    let query = `
+      SELECT o.id, o.total_amount, o.status, o.created_at, 
+             b.id as buyer_id, b.name as buyer_name, b.email as buyer_email, b.role as buyer_role,
+             s.id as seller_id, s.name as seller_name, s.role as seller_role
+      FROM orders o
+      JOIN users b ON o.buyer_id = b.id
+      LEFT JOIN users s ON o.seller_id = s.id
+    `;
+
+    let params = [];
+    if (role !== 'admin' && role !== 'superadmin' && role !== 'superadmin@xllentfoods.com') {
+      query += ` WHERE o.buyer_id = $1 OR o.seller_id = $1 OR b.parent_id = $1`;
+      params.push(userId);
+    }
+
+    query += ` ORDER BY o.created_at DESC`;
+
+    const result = await pool.query(query, params);
+    res.json({ orders: result.rows });
+  } catch (err) {
+    console.error('Failed to fetch orders:', err);
+    res.status(500).json({ message: 'Failed to fetch orders' });
+  }
+});
+
 app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
@@ -558,17 +565,18 @@ app.get('/api/admin/downline-users', async (req, res) => {
   try {
     const { userId, role } = req.query;
 
-    if (role === 'admin' || role === 'superadmin') {
-      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role != 'superadmin' ORDER BY role, name ASC");
+    if (role === 'admin' || role === 'superadmin' || role === 'superadmin@xllentfoods.com') {
+      const result = await pool.query("SELECT id, name, email, role, phone, location, parent_id FROM users WHERE role NOT IN ('superadmin', 'employee') ORDER BY role, name ASC");
       return res.json({ users: result.rows });
     }
 
     const result = await pool.query(`
       WITH RECURSIVE downline AS (
-        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1
+        SELECT id, name, email, role, phone, location, parent_id FROM users WHERE parent_id = $1 AND role != 'employee'
         UNION
         SELECT u.id, u.name, u.email, u.role, u.phone, u.location, u.parent_id FROM users u
         JOIN downline d ON u.parent_id = d.id
+        WHERE u.role != 'employee'
       )
       SELECT * FROM downline ORDER BY role, name ASC
     `, [userId]);
@@ -702,7 +710,6 @@ app.put('/api/admin/enquiries/:id', async (req, res) => {
     const { id } = req.params;
     const { fullName, email, phone, roleType, location, message, status } = req.body;
     
-    // Fallback if full_name is sent as fullName or vice versa
     const nameToSave = fullName || req.body.full_name;
     const roleToSave = roleType || req.body.role_type;
 
