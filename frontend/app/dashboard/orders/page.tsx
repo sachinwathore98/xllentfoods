@@ -182,82 +182,106 @@ export default function AdminOrdersPage() {
       setIsDownloading(true);
       const pdf = new jsPDF('p', 'mm', 'a4');
       
-      // Header Background
-      pdf.setFillColor(245, 158, 11); // Amber-500
-      pdf.rect(0, 0, 210, 35, 'F');
+      // Top Decorative Accent Bar
+      pdf.setFillColor(217, 119, 6); // Amber-600
+      pdf.rect(0, 0, 210, 4, 'F');
 
-      // Header Title
-      pdf.setTextColor(15, 23, 42); // Slate-900
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(22);
-      pdf.text('XLLENT FOODS', 15, 20);
+      // Main Header Background
+      pdf.setFillColor(15, 23, 42); // Slate-900
+      pdf.rect(0, 4, 210, 36, 'F');
 
-      pdf.setFontSize(10);
-      pdf.text('DISTRIBUTION MANAGEMENT SYSTEM | TAX INVOICE', 15, 27);
-
-      // Invoice Details (Right Aligned)
+      // Header Brand Text
       pdf.setTextColor(255, 255, 255);
-      pdf.setFontSize(11);
-      pdf.text(`Invoice #XFP-INV-${invoiceOrder.id}`, 195, 18, { align: 'right' });
-      pdf.setFontSize(9);
-      pdf.text(`Date: ${new Date(invoiceOrder.created_at).toLocaleDateString()}`, 195, 25, { align: 'right' });
-
-      // Reset text color for body
-      pdf.setTextColor(30, 41, 59);
-
-      // GSTIN & Metadata
-      pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('GSTIN: 27AABCX1234F1Z5', 15, 48);
+      pdf.setFontSize(20);
+      pdf.text('XLLENT FOODS', 18, 19);
 
-      // Billing Box
-      pdf.setFillColor(248, 250, 252); // Slate-50
-      pdf.setDrawColor(226, 232, 240); // Slate-200
-      pdf.roundedRect(15, 55, 180, 30, 3, 3, 'FD');
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(217, 119, 6); // Amber-600
+      pdf.text('DISTRIBUTION MANAGEMENT SYSTEM', 18, 25);
 
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184); // Slate-400
+      pdf.text('Official Tax Invoice & Fulfillment Receipt', 18, 30);
+
+      // Invoice Meta (Right Aligned in Header)
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(255, 255, 255);
+      pdf.text(`INVOICE #XFP-INV-${invoiceOrder.id}`, 192, 18, { align: 'right' });
+      pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text('BILLED TO (DOWNSTREAM PARTNER):', 20, 64);
-      pdf.text('FULFILLED BY (UPLINE):', 110, 64);
+      pdf.setTextColor(210, 215, 225);
+      pdf.text(`Date: ${new Date(invoiceOrder.created_at).toLocaleDateString()}`, 192, 25, { align: 'right' });
 
+      // GSTIN Section Banner
+      pdf.setFillColor(254, 243, 199); // Amber-100
+      pdf.rect(15, 48, 180, 10, 'F');
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9);
+      pdf.setTextColor(180, 83, 9); // Amber-800
+      pdf.text('GSTIN: 27AABCX1234F1Z5', 20, 54.5);
+
+      // Billing & Fulfillment Box
+      pdf.setDrawColor(226, 232, 240); // Slate-200
+      pdf.setFillColor(248, 250, 252); // Slate-50
+      pdf.roundedRect(15, 64, 180, 36, 3, 3, 'FD');
+
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text('BILLED TO (DOWNSTREAM PARTNER)', 20, 73);
+      pdf.text('FULFILLED BY (UPLINE)', 110, 73);
+
+      pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(invoiceOrder.buyer_name || 'N/A', 20, 71);
-      pdf.text(invoiceOrder.seller_name || 'Xllent Foods Central Hub', 110, 71);
+      pdf.text(invoiceOrder.buyer_name || 'N/A', 20, 81);
+      pdf.text(invoiceOrder.seller_name || 'Xllent Foods Central Hub', 110, 81);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
-      pdf.text(`Role: ${invoiceOrder.buyer_role || 'Shop'}`, 20, 78);
-      pdf.text(`Authorized Distribution Network`, 110, 78);
+      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'Shop').toUpperCase()}`, 20, 88);
+      pdf.text(`Authorized Distribution Network`, 110, 88);
 
       // Table Header
       pdf.setFillColor(241, 245, 249); // Slate-100
-      pdf.rect(15, 95, 180, 10, 'F');
+      pdf.rect(15, 108, 180, 10, 'F');
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(9);
       pdf.setTextColor(71, 85, 105);
-      pdf.text('FULFILLMENT STATUS', 20, 101.5);
-      pdf.text('GRAND TOTAL (INCL. GST)', 190, 101.5, { align: 'right' });
+      pdf.text('ORDER STATUS & DETAILS', 20, 114.5);
+      pdf.text('GRAND TOTAL (INCL. GST)', 190, 114.5, { align: 'right' });
 
-      // Table Row
-      pdf.setFont('helvetica', 'normal');
-      pdf.setTextColor(15, 23, 42);
-      pdf.text((invoiceOrder.status || 'Pending').toUpperCase(), 20, 114);
+      // Table Data Row
       pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(11);
-      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, 114, { align: 'right' });
+      pdf.setFontSize(10);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text((invoiceOrder.status || 'Pending').toUpperCase(), 20, 128);
+      
+      pdf.setFontSize(13);
+      pdf.setTextColor(217, 119, 6); // Amber-600
+      pdf.text(`Rs. ${invoiceOrder.total_amount}`, 190, 128, { align: 'right' });
 
-      // Divider line
+      // Divider Line
       pdf.setDrawColor(226, 232, 240);
-      pdf.line(15, 122, 195, 122);
+      pdf.line(15, 138, 195, 138);
 
-      // Footer
+      // Terms & Footer Note
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8);
+      pdf.setTextColor(148, 163, 184);
+      pdf.text('Terms & Conditions: Goods once sold will not be taken back. Subject to local jurisdiction.', 15, 150);
+
+      // Bottom Branding Footer
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(0, 280, 210, 17, 'F');
       pdf.setFont('helvetica', 'italic');
       pdf.setFontSize(9);
       pdf.setTextColor(100, 116, 139);
-      pdf.text('Thank you for your business partnership with Xllent Foods!', 105, 135, { align: 'center' });
+      pdf.text('Thank you for your business partnership with Xllent Foods!', 105, 290, { align: 'center' });
 
       // Save PDF
       pdf.save(`Xllent_Foods_Invoice_${invoiceOrder.id}.pdf`);
