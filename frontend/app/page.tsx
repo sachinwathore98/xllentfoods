@@ -115,6 +115,7 @@ export default function HomePage() {
   }, 0);
   const cartGrandTotal = cartSubtotal + totalGstAmount;
 
+  // Separate horizontal and vertical ads
   const horizontalAds = ads.filter((ad) => ad.banner_type === 'horizontal' || !ad.banner_type);
   const verticalAds = ads.filter((ad) => ad.banner_type === 'vertical');
 
@@ -160,7 +161,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Professional Horizontal Ad Showcase (Top Spotlight) */}
+      {/* Automated Horizontal Ad Formula Showcase (Displays top horizontal ad if available) */}
       {horizontalAds.length > 0 && (
         <section className="max-w-[95rem] mx-auto px-4 sm:px-6 pt-8 w-full">
           <div className="relative rounded-3xl overflow-hidden shadow-2xl border-2 border-amber-500/30 bg-slate-950 group">
@@ -168,10 +169,10 @@ export default function HomePage() {
               <img src={horizontalAds[0].image_url} alt="Spotlight Banner" className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-90" />
               <div className="absolute inset-0 bg-gradient-to-r from-slate-950/80 via-transparent to-transparent flex flex-col justify-center p-6 sm:p-10">
                 <span className="bg-amber-500 text-slate-950 text-[10px] font-black uppercase px-3 py-1 rounded-full shadow-lg tracking-widest w-fit mb-2 flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 animate-spin" /> Sponsored Spotlight
+                  <Sparkles className="w-3 h-3 animate-spin" /> Featured Spotlight
                 </span>
-                <h2 className="text-xl sm:text-3xl font-black text-white drop-shadow">{horizontalAds[0].title || 'Exclusive Seasonal Offers'}</h2>
-                <p className="text-xs text-amber-300 font-semibold mt-1 flex items-center gap-1">Click to claim wholesale bulk margins <ExternalLink className="w-3 h-3" /></p>
+                <h2 className="text-xl sm:text-3xl font-black text-white drop-shadow">{horizontalAds[0].title || 'Wholesale Promotional Campaign'}</h2>
+                <p className="text-xs text-amber-300 font-semibold mt-1 flex items-center gap-1">Explore campaign details <ExternalLink className="w-3 h-3" /></p>
               </div>
             </a>
           </div>
@@ -228,7 +229,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Main Catalog View with Grid Layout and Integrated Vertical Sidebar Ads */}
+      {/* Main Full-Screen Catalog View with Automated Banner Distribution Formula */}
       <main className="flex-grow max-w-[95rem] mx-auto px-4 sm:px-6 py-10 w-full">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center gap-3">
@@ -240,32 +241,36 @@ export default function HomePage() {
           </span>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Main Products Grid Column (Takes 3 columns) */}
-          <div className="lg:col-span-3 space-y-8">
-            {loading ? (
-              <div className="text-center py-24 text-slate-400 text-sm font-bold animate-pulse">Loading live catalog inventory...</div>
-            ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-24 bg-white rounded-3xl border border-slate-200 text-slate-400 text-sm font-bold">No products found.</div>
-            ) : (
-              <div>
-                {filteredProducts.map((product, index) => {
-                  const adIndex = Math.floor(index / 20);
-                  const activeHorizontalAd = horizontalAds.length > 1 ? horizontalAds[(adIndex + 1) % horizontalAds.length] : null;
-                  const showHorizontalAd = (index + 1) % 20 === 0 && activeHorizontalAd;
+        <div className="w-full">
+          {loading ? (
+            <div className="text-center py-24 text-slate-400 text-sm font-bold animate-pulse">Loading live catalog inventory...</div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="text-center py-24 bg-white rounded-3xl border border-slate-200 text-slate-400 text-sm font-bold">No products found.</div>
+          ) : (
+            <div>
+              {filteredProducts.map((product, index) => {
+                const isGridStart = index % 10 === 0;
+                const gridChunk = filteredProducts.slice(index, index + 10);
 
-                  const isGridStart = index % 10 === 0;
-                  const gridChunk = filteredProducts.slice(index, index + 10);
+                if (!isGridStart) return null;
 
-                  if (!isGridStart) return null;
+                const chunkCycleIndex = Math.floor(index / 10);
+                const isCategoryTicker = chunkCycleIndex % 2 === 0;
+                const tickerProductsSlice = products.slice((chunkCycleIndex * 5) % Math.max(1, products.length - 5), ((chunkCycleIndex * 5) % Math.max(1, products.length - 5)) + 6);
 
-                  const chunkCycleIndex = Math.floor(index / 10);
-                  const isCategoryTicker = chunkCycleIndex % 2 === 0;
-                  const tickerProductsSlice = products.slice((chunkCycleIndex * 5) % Math.max(1, products.length - 5), ((chunkCycleIndex * 5) % Math.max(1, products.length - 5)) + 6);
+                // Automated Formula: Automatically distribute horizontal ads across chunks based on index modulo available horizontal ads count
+                const activeHorizontalAd = horizontalAds.length > 0 ? horizontalAds[chunkCycleIndex % horizontalAds.length] : null;
+                const showHorizontalAd = activeHorizontalAd && (chunkCycleIndex % 2 === 1); // display every alternate chunk
 
-                  return (
-                    <React.Fragment key={`chunk-${index}`}>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6 mb-8">
+                // Automated Formula: Automatically select a vertical ad for this chunk if available
+                const activeVerticalAd = verticalAds.length > 0 ? verticalAds[chunkCycleIndex % verticalAds.length] : null;
+
+                return (
+                  <React.Fragment key={`chunk-${index}`}>
+                    {/* Full-Screen Grid Section with Optional Embedded Vertical Banner */}
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+                      {/* Products Grid (Takes 3 columns when vertical ad is present, or 4 full columns if no vertical ad) */}
+                      <div className={activeVerticalAd ? "lg:col-span-3 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6" : "lg:col-span-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6"}>
                         {gridChunk.map((p) => (
                           <div key={p.id} className="bg-white rounded-3xl border border-slate-200/90 overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 flex flex-col justify-between group relative">
                             <div className="absolute top-3 right-3 z-10 bg-amber-500 text-slate-950 font-black text-[10px] px-2.5 py-1 rounded-full shadow-md uppercase tracking-wider">
@@ -316,105 +321,93 @@ export default function HomePage() {
                         ))}
                       </div>
 
-                      {/* Live Alternating Ticker Slider with Images */}
-                      <div className="my-10 bg-slate-900 py-6 px-4 rounded-3xl shadow-2xl overflow-hidden relative border border-slate-800">
-                        <div className="px-2 mb-4 flex items-center justify-between">
-                          <span className="text-xs font-black uppercase text-amber-400 tracking-widest flex items-center gap-2">
-                            <Sparkles className="w-4 h-4 animate-spin" /> {isCategoryTicker ? 'Featured Graphical Categories Spotlight' : 'Best-Selling Spotlight Products'}
-                          </span>
-                          <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Interactive Ticker Feed</span>
-                        </div>
-                        <div className="flex overflow-x-hidden whitespace-nowrap relative w-full">
-                          <div className="flex animate-marquee gap-6 items-center">
-                            {isCategoryTicker
-                              ? categories.concat(categories).map((cat, idx) => (
-                                  <button
-                                    key={idx}
-                                    onClick={() => handleCategoryChange(cat.name)}
-                                    className="flex items-center gap-4 bg-slate-800/90 border border-slate-700 p-3 pr-6 rounded-2xl shadow-xl shrink-0 hover:border-amber-500 hover:scale-105 transition duration-300 cursor-pointer text-left group"
-                                  >
-                                    <div className="w-14 h-14 rounded-xl bg-slate-700 overflow-hidden flex items-center justify-center shrink-0 border border-slate-600 shadow-inner">
-                                      <img src={cat.image} alt={cat.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
-                                    </div>
-                                    <div>
-                                      <span className="text-white text-xs font-black tracking-wide uppercase block group-hover:text-amber-400 transition">{cat.name}</span>
-                                      <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 mt-0.5">Explore Range <ChevronRight className="w-3 h-3" /></span>
-                                    </div>
-                                  </button>
-                                ))
-                              : tickerProductsSlice.concat(tickerProductsSlice).map((prod, idx) => (
-                                  <a
-                                    key={idx}
-                                    href={`/products/${prod.id}`}
-                                    className="flex items-center gap-4 bg-slate-800/90 border border-slate-700 p-3 pr-6 rounded-2xl shadow-xl shrink-0 hover:border-amber-500 hover:scale-105 transition duration-300 cursor-pointer text-left group"
-                                  >
-                                    <div className="w-14 h-14 rounded-xl bg-slate-700 overflow-hidden flex items-center justify-center shrink-0 border border-slate-600 shadow-inner">
-                                      {prod.image ? (
-                                        <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
-                                      ) : (
-                                        <Package className="w-6 h-6 text-slate-400" />
-                                      )}
-                                    </div>
-                                    <div>
-                                      <span className="text-white text-xs font-black tracking-wide truncate max-w-[150px] block group-hover:text-amber-400 transition">{prod.name}</span>
-                                      <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 mt-0.5">₹{prod.mrp} — View Product <ChevronRight className="w-3 h-3" /></span>
-                                    </div>
-                                  </a>
-                                ))}
+                      {/* Automatically Distributed Vertical Banner Column (Appears naturally within the grid flow) */}
+                      {activeVerticalAd && (
+                        <div className="lg:col-span-1 flex flex-col justify-between">
+                          <div className="bg-slate-950 p-4 rounded-3xl shadow-xl border border-slate-800 text-white h-full flex flex-col justify-between">
+                            <div className="flex items-center justify-between text-[10px] font-black uppercase text-amber-400 tracking-widest border-b border-slate-800 pb-2 mb-3">
+                              <span>Sponsored Spotlight</span>
+                              <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                            </div>
+                            <div className="rounded-2xl overflow-hidden border border-slate-800 group relative flex-grow">
+                              <a href={activeVerticalAd.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-full min-h-[280px]">
+                                <img src={activeVerticalAd.image_url} alt="Vertical Ad" className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-95" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/20 to-transparent p-4 flex flex-col justify-end">
+                                  <span className="text-xs font-black text-white">{activeVerticalAd.title || 'Exclusive Promo'}</span>
+                                  <span className="text-[10px] text-amber-400 font-bold mt-1 flex items-center gap-1">Tap to explore <ExternalLink className="w-3 h-3" /></span>
+                                </div>
+                              </a>
+                            </div>
                           </div>
                         </div>
-                      </div>
-
-                      {/* Horizontal Ad Banner */}
-                      {showHorizontalAd && (
-                        <div className="my-8 overflow-hidden rounded-3xl shadow-2xl border-2 border-amber-400/50 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950">
-                          <a href={activeHorizontalAd.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-48 sm:h-60 group">
-                            <img src={activeHorizontalAd.image_url} alt="Sponsored Banner" className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-90" />
-                            <div className="absolute top-4 left-4 bg-amber-500 text-slate-950 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-xl flex items-center gap-1.5">
-                              <Sparkles className="w-3.5 h-3.5" /> {activeHorizontalAd.title || 'Featured Promotional Ad'}
-                            </div>
-                          </a>
-                        </div>
                       )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                    </div>
 
-          {/* Right Sidebar Column (Takes 1 column) housing Professional Vertical Ad Banners */}
-          <div className="lg:col-span-1 space-y-6">
-            {verticalAds.length > 0 ? (
-              <div className="bg-slate-950 p-5 rounded-3xl shadow-2xl border border-slate-800 space-y-6 text-white sticky top-28">
-                <div className="flex items-center justify-between text-xs font-black uppercase text-amber-400 tracking-widest border-b border-slate-800 pb-3">
-                  <span>Sponsored Spotlights</span>
-                  <Sparkles className="w-4 h-4 animate-spin" />
-                </div>
-                {verticalAds.map((ad, idx) => (
-                  <div key={idx} className="rounded-2xl overflow-hidden border border-slate-800 group relative shadow-xl hover:border-amber-500 transition duration-300">
-                    <a href={ad.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-72 sm:h-96">
-                      <img src={ad.image_url} alt="Vertical Ad" className="w-full h-full object-cover group-hover:scale-110 transition duration-700 opacity-95" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950/95 via-slate-950/20 to-transparent p-5 flex flex-col justify-end">
-                        <span className="bg-amber-500 text-slate-950 text-[9px] font-black uppercase px-2.5 py-0.5 rounded-full w-fit mb-2">Featured Ad</span>
-                        <h4 className="text-sm font-black text-white">{ad.title || 'Exclusive Wholesale Deal'}</h4>
-                        <p className="text-[11px] text-amber-400 font-bold mt-1 flex items-center gap-1">Tap to explore offers <ExternalLink className="w-3 h-3" /></p>
+                    {/* Live Alternating Ticker Slider with Images */}
+                    <div className="my-10 bg-slate-900 py-6 px-4 rounded-3xl shadow-2xl overflow-hidden relative border border-slate-800">
+                      <div className="px-2 mb-4 flex items-center justify-between">
+                        <span className="text-xs font-black uppercase text-amber-400 tracking-widest flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 animate-spin" /> {isCategoryTicker ? 'Featured Graphical Categories Spotlight' : 'Best-Selling Spotlight Products'}
+                        </span>
+                        <span className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Interactive Ticker Feed</span>
                       </div>
-                    </a>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-6 rounded-3xl shadow-xl text-slate-950 sticky top-28 space-y-3">
-                <span className="bg-slate-950 text-amber-400 text-[10px] font-black uppercase px-2.5 py-1 rounded-full">B2B Advantage</span>
-                <h3 className="text-lg font-black tracking-tight">Become an Authorized Distributor</h3>
-                <p className="text-xs font-medium text-slate-900 leading-relaxed">Unlock tiered pricing, regional territory privileges, and priority dispatch today.</p>
-                <a href="/partnership" className="inline-block w-full py-3 bg-slate-950 hover:bg-slate-900 text-white font-black rounded-xl text-xs uppercase tracking-wider text-center shadow-lg transition">
-                  Apply Now
-                </a>
-              </div>
-            )}
-          </div>
+                      <div className="flex overflow-x-hidden whitespace-nowrap relative w-full">
+                        <div className="flex animate-marquee gap-6 items-center">
+                          {isCategoryTicker
+                            ? categories.concat(categories).map((cat, idx) => (
+                                <button
+                                  key={idx}
+                                  onClick={() => handleCategoryChange(cat.name)}
+                                  className="flex items-center gap-4 bg-slate-800/90 border border-slate-700 p-3 pr-6 rounded-2xl shadow-xl shrink-0 hover:border-amber-500 hover:scale-105 transition duration-300 cursor-pointer text-left group"
+                                >
+                                  <div className="w-14 h-14 rounded-xl bg-slate-700 overflow-hidden flex items-center justify-center shrink-0 border border-slate-600 shadow-inner">
+                                    <img src={cat.image} alt={cat.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                                  </div>
+                                  <div>
+                                    <span className="text-white text-xs font-black tracking-wide uppercase block group-hover:text-amber-400 transition">{cat.name}</span>
+                                    <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 mt-0.5">Explore Range <ChevronRight className="w-3 h-3" /></span>
+                                  </div>
+                                </button>
+                              ))
+                            : tickerProductsSlice.concat(tickerProductsSlice).map((prod, idx) => (
+                                <a
+                                  key={idx}
+                                  href={`/products/${prod.id}`}
+                                  className="flex items-center gap-4 bg-slate-800/90 border border-slate-700 p-3 pr-6 rounded-2xl shadow-xl shrink-0 hover:border-amber-500 hover:scale-105 transition duration-300 cursor-pointer text-left group"
+                                >
+                                  <div className="w-14 h-14 rounded-xl bg-slate-700 overflow-hidden flex items-center justify-center shrink-0 border border-slate-600 shadow-inner">
+                                    {prod.image ? (
+                                      <img src={prod.image} alt={prod.name} className="w-full h-full object-cover group-hover:scale-110 transition duration-500" />
+                                    ) : (
+                                      <Package className="w-6 h-6 text-slate-400" />
+                                    )}
+                                  </div>
+                                  <div>
+                                    <span className="text-white text-xs font-black tracking-wide truncate max-w-[150px] block group-hover:text-amber-400 transition">{prod.name}</span>
+                                    <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 mt-0.5">₹{prod.mrp} — View Product <ChevronRight className="w-3 h-3" /></span>
+                                  </div>
+                                </a>
+                              ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Automatically Distributed Horizontal Ad Banner */}
+                    {showHorizontalAd && (
+                      <div className="my-8 overflow-hidden rounded-3xl shadow-2xl border-2 border-amber-400/50 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950">
+                        <a href={activeHorizontalAd.target_url || '#'} target="_blank" rel="noopener noreferrer" className="block relative h-48 sm:h-60 group">
+                          <img src={activeHorizontalAd.image_url} alt="Sponsored Banner" className="w-full h-full object-cover group-hover:scale-105 transition duration-700 opacity-90" />
+                          <div className="absolute top-4 left-4 bg-amber-500 text-slate-950 text-xs font-black uppercase px-4 py-1.5 rounded-full tracking-widest shadow-xl flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5" /> {activeHorizontalAd.title || 'Featured Promotional Ad'}
+                          </div>
+                        </a>
+                      </div>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </div>
+          )}
         </div>
       </main>
 
