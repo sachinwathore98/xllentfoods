@@ -26,7 +26,7 @@ export default function AdminOrdersPage() {
   // Edit Order State
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
   const [editStatus, setEditStatus] = useState('Pending');
-  const [editTotalAmount, setEditTotalAmount] = useState('');
+  const [editItems, setEditItems] = useState<any[]>([]);
 
   // Invoice State
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
@@ -174,15 +174,52 @@ export default function AdminOrdersPage() {
     }
   };
 
+  // Open Edit Order Modal
+  const openEditModal = async (order: any) => {
+    setEditingOrder(order);
+    setEditStatus(order.status || 'Pending');
+    // Fetch pricing for buyer if needed, or map existing items
+    setEditItems(order.items ? order.items.map((i: any) => ({
+      productId: i.product_id || i.productId,
+      name: i.name,
+      sku: i.sku || 'N/A',
+      quantity: i.quantity,
+      unitPrice: i.unit_price || i.unitPrice,
+      gstPercent: i.gst_percent || i.gstPercent || 0
+    })) : []);
+  };
+
+  const handleEditQuantityChange = (index: number, qty: number) => {
+    const quantity = Math.max(0, qty);
+    setEditItems((prev) => {
+      if (quantity === 0) {
+        return prev.filter((_, idx) => idx !== index);
+      }
+      return prev.map((item, idx) => idx === index ? { ...item, quantity } : item);
+    });
+  };
+
+  const handleRemoveEditItem = (index: number) => {
+    setEditItems((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
   const handleUpdateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingOrder) return;
+
+    const subtotal = editItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice), 0);
+    const totalGst = editItems.reduce((acc, item) => acc + ((item.quantity * item.unitPrice * (item.gstPercent || 0)) / 100), 0);
+    const totalAmount = Number((subtotal + totalGst).toFixed(2));
+
     try {
-      await API.put(`/api/orders/${editingOrder.id}/status`, { status: editStatus });
-      // If total amount editing is supported, can also update here
+      await API.put(`/api/orders/${editingOrder.id}`, {
+        status: editStatus,
+        items: editItems,
+        totalAmount
+      });
       setEditingOrder(null);
       fetchOrders(currentUser.id, currentUser.role);
-      alert('Order successfully updated!');
+      alert('Order successfully updated with new items and totals!');
     } catch (err) {
       console.error('Failed to update order', err);
       alert('Failed to update order.');
@@ -506,12 +543,9 @@ export default function AdminOrdersPage() {
                         <FileText className="w-3.5 h-3.5 text-amber-600" /> Invoice
                       </button>
                       <button
-                        onClick={() => {
-                          setEditingOrder(o);
-                          setEditStatus(o.status || 'Pending');
-                        }}
+                        onClick={() => openEditModal(o)}
                         className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 font-extrabold rounded-xl inline-flex items-center gap-1 transition cursor-pointer"
-                        title="Edit Order"
+                        title="Edit Order Items"
                       >
                         <Edit3 className="w-3.5 h-3.5" /> Edit
                       </button>
@@ -533,17 +567,17 @@ export default function AdminOrdersPage() {
 
       {/* Edit Order Modal */}
       {editingOrder && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-md p-6 md:p-8 space-y-6 shadow-2xl">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-2xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
                 <h3 className="text-lg font-black text-slate-900">Edit Order #XFP-{editingOrder.id}</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Update order fulfillment status for {editingOrder.buyer_name}</p>
+                <p className="text-xs text-slate-500 mt-0.5">Modify items, quantities, or fulfillment status for {editingOrder.buyer_name}</p>
               </div>
               <button onClick={() => setEditingOrder(null)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             </div>
 
-            <form onSubmit={handleUpdateOrder} className="space-y-4">
+            <form onSubmit={handleUpdateOrder} className="space-y-6">
               <div>
                 <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Fulfillment Status</label>
                 <select
@@ -560,9 +594,37 @@ export default function AdminOrdersPage() {
                 </select>
               </div>
 
-              <div className="bg-slate-50 p-4 rounded-2xl text-xs space-y-1">
-                <p><strong>Total Amount:</strong> ₹{editingOrder.total_amount}</p>
-                <p><strong>Partner:</strong> {editingOrder.buyer_name}</p>
+              <div className="space-y-3">
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Order Items & Quantities</label>
+                <div className="border border-slate-200 rounded-2xl max-h-60 overflow-y-auto divide-y divide-slate-100 bg-slate-50/50 p-3 space-y-2">
+                  {editItems.length === 0 ? (
+                    <div className="text-center py-6 text-xs text-slate-400 font-medium">No items in this order.</div>
+                  ) : (
+                    editItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center justify-between py-2 px-3 bg-white rounded-xl border border-slate-200 gap-4">
+                        <div>
+                          <p className="text-xs font-black text-slate-900">{item.name}</p>
+                          <p className="text-[10px] text-slate-500">SKU: {item.sku} | Price: ₹{item.unitPrice}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            min="1"
+                            value={item.quantity}
+                            onChange={(e) => handleEditQuantityChange(idx, Number(e.target.value))}
+                            className="w-16 bg-slate-50 border border-slate-300 rounded-xl px-2 py-1 text-xs font-black text-center focus:outline-none focus:border-amber-500"
+                          />
+                          <button type="button" onClick={() => handleRemoveEditItem(idx)} className="text-rose-500 hover:text-rose-700 p-1"><Trash2 className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex justify-between items-center text-xs font-black text-amber-900">
+                <span>Updated Grand Total (Incl. GST):</span>
+                <span className="text-base text-amber-600">₹{editItems.reduce((acc, item) => acc + (item.quantity * item.unitPrice * (1 + (item.gstPercent || 0)/100)), 0).toFixed(2)}</span>
               </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">

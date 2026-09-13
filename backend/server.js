@@ -479,14 +479,32 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-app.put('/api/orders/:id/status', async (req, res) => {
+// Update Order, items, and status
+app.put('/api/orders/:id', async (req, res) => {
+  const { id } = req.params;
+  const { items, totalAmount, status } = req.body;
   try {
-    const { id } = req.params;
-    const { status } = req.body;
-    await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
-    res.json({ message: 'Order status updated successfully' });
+    if (status !== undefined || totalAmount !== undefined) {
+      await pool.query(
+        "UPDATE orders SET status = COALESCE($1, status), total_amount = COALESCE($2, total_amount) WHERE id = $3",
+        [status, totalAmount, id]
+      );
+    }
+
+    if (items && Array.isArray(items)) {
+      await pool.query("DELETE FROM order_items WHERE order_id = $1", [id]);
+      for (let item of items) {
+        await pool.query(
+          "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+          [id, item.productId || item.product_id, item.quantity, item.unitPrice || item.unit_price]
+        );
+      }
+    }
+
+    res.json({ success: true, message: 'Order successfully updated' });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to update order status' });
+    console.error('Update Order Error:', err);
+    res.status(500).json({ error: 'Failed to update order in database' });
   }
 });
 
