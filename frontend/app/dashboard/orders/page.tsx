@@ -1,7 +1,9 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X, Trash2, Package } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Trash2, Edit3, Download, Package } from 'lucide-react';
+import html2canvas from 'html2canvas';
+import jsPDF from 'jspdf';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -18,8 +20,10 @@ export default function AdminOrdersPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [orderItems, setOrderItems] = useState<{ productId: number; name: string; category: string; quantity: number; unitPrice: number; gstPercent: number }[]>([]);
   
-  // Invoice Modal State
+  // Invoice & Edit States
   const [invoiceOrder, setInvoiceOrder] = useState<any | null>(null);
+  const [editingOrder, setEditingOrder] = useState<any | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
     const userStr = localStorage.getItem('user');
@@ -162,6 +166,50 @@ export default function AdminOrdersPage() {
     }
   };
 
+  const handleDeleteOrder = async (orderId: number) => {
+    if (!confirm('Are you sure you want to delete this order?')) return;
+    try {
+      await API.delete(`/api/orders/${orderId}`);
+      fetchOrders(currentUser.id, currentUser.role);
+    } catch (err) {
+      console.error('Failed to delete order', err);
+      alert('Failed to delete order.');
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    const input = document.getElementById('invoice-pdf-content');
+    if (!input) return;
+    try {
+      setIsDownloading(true);
+      const canvas = await html2canvas(input, { scale: 2, useCORS: true });
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const imgWidth = 210;
+      const pageHeight = 295;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      let heightLeft = imgHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft >= 0) {
+        position = heightLeft - imgHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+      }
+
+      pdf.save(`Xllent_Foods_Invoice_${invoiceOrder?.id || 'Bill'}.pdf`);
+    } catch (err) {
+      console.error('PDF generation error:', err);
+      alert('Failed to download PDF invoice.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const filteredProducts = selectedCategory === 'All' 
     ? products 
     : products.filter(p => p.category === selectedCategory);
@@ -238,6 +286,13 @@ export default function AdminOrdersPage() {
                         <option value="Approved">Approved</option>
                         <option value="Cancelled">Cancelled</option>
                       </select>
+                      <button
+                        onClick={() => handleDeleteOrder(o.id)}
+                        className="p-1.5 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-xl transition cursor-pointer inline-flex items-center"
+                        title="Delete Order"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -375,71 +430,70 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Invoice Modal / PDF Download with Official Logo & GST Details */}
+      {/* Invoice Modal with Official Logo & PDF Download */}
       {invoiceOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white text-slate-900 rounded-3xl w-full max-w-2xl p-8 space-y-6 shadow-2xl relative border border-slate-200 my-8">
             <button onClick={() => setInvoiceOrder(null)} className="absolute top-6 right-6 text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50"><X className="w-5 h-5" /></button>
             
-            {/* Official Branded Header with Logo */}
-            <div className="flex justify-between items-start border-b border-slate-200 pb-5">
-              <div className="flex items-center gap-3.5">
-                <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-amber-600 rounded-2xl flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-amber-500/30 border-2 border-amber-400">
-                  XF
+            {/* Printable Container for PDF Export */}
+            <div id="invoice-pdf-content" className="bg-white p-6 rounded-2xl space-y-6">
+              <div className="flex justify-between items-start border-b border-slate-200 pb-5">
+                <div className="flex items-center gap-3.5">
+                  <img src="/images/logo.png" alt="Xllent Foods Logo" className="w-14 h-14 object-contain rounded-2xl border border-slate-200 bg-white p-1" crossOrigin="anonymous" />
+                  <div>
+                    <h2 className="text-xl font-black text-slate-900 tracking-tight">XLLENT FOODS</h2>
+                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Distribution Management System</p>
+                    <p className="text-[10px] text-amber-600 font-extrabold mt-0.5">GSTIN: 27AABCX1234F1Z5</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-mono text-xs font-bold text-slate-800">Tax Invoice #XFP-INV-{invoiceOrder.id}</p>
+                  <p className="text-[11px] text-slate-500">{new Date(invoiceOrder.created_at).toLocaleDateString()}</p>
+                  <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase rounded-md">GST Tax Invoice</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                <div>
+                  <span className="text-slate-400 block font-bold uppercase text-[10px]">Billed To (Downstream Partner):</span>
+                  <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.buyer_name}</p>
+                  <p className="text-slate-600 text-[11px]">{invoiceOrder.buyer_email} ({invoiceOrder.buyer_role})</p>
                 </div>
                 <div>
-                  <h2 className="text-xl font-black text-slate-900 tracking-tight">XLLENT FOODS</h2>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">Distribution Management System</p>
-                  <p className="text-[10px] text-amber-600 font-extrabold mt-0.5">GSTIN: 27AABCX1234F1Z5</p>
+                  <span className="text-slate-400 block font-bold uppercase text-[10px]">Fulfilled By (Upline):</span>
+                  <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.seller_name || 'Xllent Foods Central Hub'}</p>
+                  <p className="text-slate-600 text-[11px]">Authorized Distribution Network</p>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-mono text-xs font-bold text-slate-800">Tax Invoice #XFP-INV-{invoiceOrder.id}</p>
-                <p className="text-[11px] text-slate-500">{new Date(invoiceOrder.created_at).toLocaleDateString()}</p>
-                <span className="inline-block mt-1 px-2.5 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-black uppercase rounded-md">GST Tax Invoice</span>
-              </div>
-            </div>
 
-            {/* Billing Details */}
-            <div className="grid grid-cols-2 gap-4 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-100">
-              <div>
-                <span className="text-slate-400 block font-bold uppercase text-[10px]">Billed To (Downstream Partner):</span>
-                <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.buyer_name}</p>
-                <p className="text-slate-600 text-[11px]">{invoiceOrder.buyer_email} ({invoiceOrder.buyer_role})</p>
+              <div className="border border-slate-200 rounded-2xl overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-wider">
+                      <th className="p-3">Fulfillment Status</th>
+                      <th className="p-3 text-right">Grand Total (Incl. GST)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="border-t border-slate-100">
+                      <td className="p-3 font-bold text-slate-800 uppercase">{invoiceOrder.status}</td>
+                      <td className="p-3 text-right font-black text-slate-900 text-sm">₹{invoiceOrder.total_amount}</td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
-              <div>
-                <span className="text-slate-400 block font-bold uppercase text-[10px]">Fulfilled By (Upline):</span>
-                <p className="font-black text-slate-900 mt-0.5">{invoiceOrder.seller_name || 'Xllent Foods Central Hub'}</p>
-                <p className="text-slate-600 text-[11px]">Authorized Distribution Network</p>
-              </div>
-            </div>
-
-            {/* Invoice Summary Table */}
-            <div className="border border-slate-200 rounded-2xl overflow-hidden">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="bg-slate-100 text-slate-600 font-black text-[10px] uppercase tracking-wider">
-                    <th className="p-3">Fulfillment Status</th>
-                    <th className="p-3 text-right">Grand Total (Incl. GST)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="border-t border-slate-100">
-                    <td className="p-3 font-bold text-slate-800 uppercase">{invoiceOrder.status}</td>
-                    <td className="p-3 text-right font-black text-slate-900 text-sm">₹{invoiceOrder.total_amount}</td>
-                  </tr>
-                </tbody>
-              </table>
             </div>
 
             {/* Footer Actions / Download PDF */}
             <div className="flex justify-between items-center pt-4 border-t border-slate-200">
               <span className="text-xs text-slate-500 font-medium">Thank you for your business partnership with Xllent Foods!</span>
               <button 
-                onClick={() => window.print()} 
+                onClick={handleDownloadPDF} 
+                disabled={isDownloading}
                 className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer flex items-center gap-2"
               >
-                <FileText className="w-4 h-4" /> Download / Print PDF Invoice
+                <Download className="w-4 h-4" /> {isDownloading ? 'Generating PDF...' : 'Download PDF Invoice'}
               </button>
             </div>
           </div>
