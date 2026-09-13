@@ -107,8 +107,7 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         product_id INT REFERENCES products(id) ON DELETE CASCADE,
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
-        custom_price NUMERIC(10,2) NOT NULL,
-        UNIQUE(product_id, user_id)
+        custom_price NUMERIC(10,2) NOT NULL
       );
 
       ALTER TABLE downline_pricing_overrides ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE CASCADE;
@@ -435,9 +434,10 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
     const { userId, productId, customPrice } = req.body;
     
     if (!userId || !productId || customPrice === undefined) {
-      return res.status(400).json({ message: 'Missing required fields: userId, productId, or customPrice' });
+      return res.status(400).json({ message: 'Missing required parameters' });
     }
 
+    // Safe Update-then-Insert logic to avoid any conflict constraint errors
     const updateRes = await pool.query(`
       UPDATE downline_pricing_overrides 
       SET custom_price = $1 
@@ -454,7 +454,7 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
 
     res.json({ message: 'User-specific product pricing successfully updated' });
   } catch (err) {
-    console.error('User Pricing Override Error Details:', err);
+    console.error('User Pricing Override Error:', err);
     res.status(500).json({ message: `Failed to update pricing: ${err.message}` });
   }
 });
