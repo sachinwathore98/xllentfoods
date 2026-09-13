@@ -255,15 +255,15 @@ export default function AdminOrdersPage() {
       // Selected Vendor & Upline Details Box
       pdf.setDrawColor(226, 232, 240);
       pdf.setFillColor(248, 250, 252);
-      pdf.roundedRect(15, 63, 180, 44, 3, 3, 'FD');
+      pdf.roundedRect(15, 63, 180, 46, 3, 3, 'FD');
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text('BILLED TO (SELECTED STOCKIST / PARTNER)', 20, 71);
+      pdf.text('BILLED TO (SELECTED STOCKIST / VENDOR PARTNER)', 20, 71);
       pdf.text('FULFILLED BY (UPLINE HUB)', 110, 71);
 
-      // Selected Stockist Details (e.g. Munja Mandge - Parbhani, Rajtilak - Jalna)
+      // Selected Partner Details (Super Stockist / Distributor / Shop)
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
@@ -273,8 +273,9 @@ export default function AdminOrdersPage() {
       pdf.setFontSize(8.5);
       pdf.setTextColor(71, 85, 105);
       pdf.text(`Email: ${invoiceOrder.buyer_email || 'N/A'}`, 20, 85);
-      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'SUPER_STOCKIST').toUpperCase()}`, 20, 91);
-      pdf.text(`Territory / Location: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 97);
+      pdf.text(`Phone: ${invoiceOrder.buyer_phone || 'N/A'}`, 20, 91);
+      pdf.text(`Role: ${(invoiceOrder.buyer_role || 'SUPER_STOCKIST').toUpperCase()}`, 20, 97);
+      pdf.text(`Territory / Location: ${invoiceOrder.buyer_location || 'Registered Territory'}`, 20, 103);
 
       // Seller Details
       pdf.setFont('helvetica', 'bold');
@@ -290,7 +291,7 @@ export default function AdminOrdersPage() {
       pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
 
       // Itemized Table Header
-      let startY = 114;
+      let startY = 116;
       pdf.setFillColor(241, 245, 249);
       pdf.rect(15, startY, 180, 8, 'F');
       pdf.setFont('helvetica', 'bold');
@@ -308,13 +309,13 @@ export default function AdminOrdersPage() {
       pdf.setFontSize(8.5);
       pdf.setTextColor(15, 23, 42);
 
-      const itemsList = invoiceOrder.items || [{ name: `Standard Order Fulfillment (#XFP-${invoiceOrder.id})`, sku: 'XFP-GEN', quantity: 1, unitPrice: invoiceOrder.total_amount, gstPercent: 5 }];
+      const itemsList = invoiceOrder.items || [];
 
       itemsList.forEach((item: any, idx: number) => {
         const itemY = startY + (idx * 9);
         const qty = item.quantity || 1;
-        const pricePerPc = item.unitPrice || invoiceOrder.total_amount;
-        const gst = item.gstPercent || 0;
+        const pricePerPc = item.unit_price || item.unitPrice || 0;
+        const gst = item.gst_percent || item.gstPercent || 0;
         const lineTotal = qty * pricePerPc * (1 + gst / 100);
 
         pdf.text(`${item.name || 'Product'} [SKU: ${item.sku || 'N/A'}]`, 20, itemY);
@@ -326,7 +327,7 @@ export default function AdminOrdersPage() {
         pdf.setFont('helvetica', 'normal');
       });
 
-      startY += (itemsList.length * 9) + 4;
+      startY += (itemsList.length * 9) + 6;
       // Divider Line
       pdf.setDrawColor(226, 232, 240);
       pdf.line(15, startY, 195, startY);
