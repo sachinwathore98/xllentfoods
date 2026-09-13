@@ -107,7 +107,8 @@ async function initDatabase() {
         id SERIAL PRIMARY KEY,
         product_id INT REFERENCES products(id) ON DELETE CASCADE,
         user_id INT REFERENCES users(id) ON DELETE CASCADE,
-        custom_price NUMERIC(10,2) NOT NULL
+        custom_price NUMERIC(10,2) NOT NULL,
+        CONSTRAINT unique_user_product_override UNIQUE (user_id, product_id)
       );
 
       ALTER TABLE downline_pricing_overrides ADD COLUMN IF NOT EXISTS user_id INT REFERENCES users(id) ON DELETE CASCADE;
@@ -158,7 +159,7 @@ async function initDatabase() {
     // Seed default categories
     const catCheck = await pool.query("SELECT * FROM categories");
     if (catCheck.rows.length === 0) {
-      const defaultCategories = ['Confectionery', 'Snacks', 'Namkeen', 'Candies', 'Dry Fruits'];
+      const defaultCategories = ['Confectionery', 'Snacks', 'Namkeen', 'Candies', 'Dry Fruits', 'Biscuits', 'Cookies', 'Chikki', 'Chocolate', 'Sweets', 'Toffees'];
       for (let c of defaultCategories) {
         await pool.query("INSERT INTO categories (name) VALUES ($1) ON CONFLICT (name) DO NOTHING", [c]);
       }
@@ -440,7 +441,7 @@ app.post('/api/downline-pricing/set-user-price', async (req, res) => {
       return res.status(400).json({ message: 'Missing required parameters' });
     }
 
-    // Safe Update-then-Insert logic to avoid any conflict constraint errors
+    // Safe Update-then-Insert logic with unique constraint fallback
     const updateRes = await pool.query(`
       UPDATE downline_pricing_overrides 
       SET custom_price = $1 
@@ -474,7 +475,6 @@ app.post('/api/orders/smart', async (req, res) => {
 
     let targetSellerId = buyer.parent_id;
 
-    // Intelligent Fallback Hierarchy Routing: Super Stockist first, fallback to Distributor
     if (!targetSellerId) {
       if (buyer.role === 'shop') {
         const ssQuery = await pool.query("SELECT id FROM users WHERE role = 'super_stockist' LIMIT 1");
@@ -513,8 +513,8 @@ app.post('/api/orders/smart', async (req, res) => {
 
     res.status(201).json({ message: 'Order routed successfully through supply chain hierarchy', orderId, assignedSellerId: targetSellerId });
   } catch (err) {
-    console.error('Smart Order Error:', err);
-    res.status(500).json({ message: 'Failed to place smart order' });
+    console.error('Smart Order Error Details:', err);
+    res.status(500).json({ message: `Failed to place smart order: ${err.message}` });
   }
 });
 
@@ -556,6 +556,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
     await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
     res.json({ message: 'Order status updated successfully' });
   } catch (err) {
+    console.error('Failed to update order status:', err);
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
@@ -939,21 +940,3 @@ app.put('/api/admin/advertisements/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/admin/advertisements/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    await pool.query("DELETE FROM advertisements WHERE id = $1", [id]);
-    res.json({ message: 'Advertisement banner deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to delete advertisement banner' });
-  }
-});
-
-app.get('/api/advertisements/public', async (req, res) => {
-  try {
-    const result = await pool.query("SELECT * FROM advertisements WHERE is_active = TRUE ORDER BY created_at DESC");
-    res.json({ advertisements: result.rows });
-  } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch public advertisements' });
-  }
-});
