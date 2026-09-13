@@ -1,9 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, DollarSign, Users, ShoppingCart, UserPlus, Megaphone, HelpCircle } from 'lucide-react';
+import { LayoutDashboard, Package, DollarSign, Users, ShoppingCart, UserPlus, Megaphone } from 'lucide-react';
 
-export default function Sidebar() {
+interface SidebarProps {
+  role?: string;
+}
+
+export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
 
   const navItems = [
@@ -46,7 +50,11 @@ export default function Sidebar() {
         </nav>
       </div>
 
-      <div className="p-6 border-t border-slate-900">
+      <div className="p-6 border-t border-slate-900 space-y-3">
+        <div className="px-3 py-2 bg-slate-900 rounded-xl border border-slate-800">
+          <span className="text-[9px] uppercase font-bold text-slate-500 block">Active Session</span>
+          <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">{role || 'Admin'}</span>
+        </div>
         <button
           onClick={() => {
             localStorage.clear();
