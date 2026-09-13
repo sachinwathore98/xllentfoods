@@ -8,6 +8,7 @@ export default function AdminAdsPage() {
   const [title, setTitle] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [targetUrl, setTargetUrl] = useState('');
+  const [bannerType, setBannerType] = useState('horizontal');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -29,11 +30,12 @@ export default function AdminAdsPage() {
     setLoading(true);
     setMessage('');
     try {
-      await API.post('/api/admin/advertisements', { title, imageUrl, targetUrl });
+      await API.post('/api/admin/advertisements', { title, imageUrl, targetUrl, bannerType });
       setMessage('Advertisement banner added successfully!');
       setTitle('');
       setImageUrl('');
       setTargetUrl('');
+      setBannerType('horizontal');
       fetchAds();
       setTimeout(() => setMessage(''), 3000);
     } catch (err: any) {
@@ -64,7 +66,7 @@ export default function AdminAdsPage() {
         <h1 className="text-3xl font-black text-slate-900 tracking-tight mt-2 flex items-center gap-2">
           <Megaphone className="w-8 h-8 text-amber-600" /> Advertisement Banners Management
         </h1>
-        <p className="text-sm text-slate-500 mt-1">Add promotional banners that will automatically display across product grids after every 10 rows.</p>
+        <p className="text-sm text-slate-500 mt-1">Upload and manage horizontal catalog banners and vertical sidebar promotional slots separately.</p>
       </div>
 
       {message && (
@@ -80,7 +82,7 @@ export default function AdminAdsPage() {
           <Plus className="w-5 h-5 text-amber-600" /> Add New Ad Banner
         </h3>
         <form onSubmit={handleCreateAd} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Banner Title / Campaign Name</label>
               <input
@@ -92,6 +94,20 @@ export default function AdminAdsPage() {
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-amber-500"
               />
             </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Banner Orientation Type</label>
+              <select
+                value={bannerType}
+                onChange={(e) => setBannerType(e.target.value)}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+              >
+                <option value="horizontal">Horizontal Banner (Catalog Full-Width)</option>
+                <option value="vertical">Vertical Banner (Sidebar Slot)</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Banner Image URL</label>
               <input
@@ -141,6 +157,11 @@ export default function AdminAdsPage() {
                     <img src={ad.image_url} alt={ad.title} className="w-full h-full object-cover" />
                   </div>
                   <div className="p-4 space-y-1">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className={`text-[10px] font-black px-2.5 py-0.5 rounded uppercase ${ad.banner_type === 'vertical' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+                        {ad.banner_type || 'horizontal'}
+                      </span>
+                    </div>
                     <h4 className="font-bold text-slate-900 text-sm">{ad.title}</h4>
                     {ad.target_url && (
                       <p className="text-xs text-amber-600 truncate flex items-center gap-1 font-mono">
