@@ -1,7 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { Package, Search, Boxes } from 'lucide-react';
+import { Package, Search, Boxes, AlertTriangle, ShoppingCart, CheckCircle2 } from 'lucide-react';
+import Link from 'next/link';
 
 interface ProductStock {
   id: number;
@@ -22,8 +23,14 @@ export default function LiveInventoryStockPage() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    }
     fetchCategories();
     fetchLiveStocks();
   }, []);
@@ -49,6 +56,19 @@ export default function LiveInventoryStockPage() {
     }
   };
 
+  const handleUpdateStockStatus = async (productId: number, newStatus: string) => {
+    try {
+      await API.put(`/api/admin/products/${productId}/stock`, { status: newStatus });
+      setMessage('Stock status updated successfully!');
+      fetchLiveStocks();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (err) {
+      alert('Failed to update stock status.');
+    }
+  };
+
+  const isAdmin = currentUser?.role === 'admin' || currentUser?.role === 'superadmin' || currentUser?.role === 'superadmin@xllentfoods.com';
+
   const filteredProducts = products.filter((p) => {
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
     const matchesSearch = 
@@ -57,23 +77,63 @@ export default function LiveInventoryStockPage() {
     return matchesCategory && matchesSearch;
   });
 
+  const lowStockCount = products.filter(p => p.status === 'Out of Stock' || p.status === 'Low Stock').length;
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 text-slate-800 bg-slate-50 min-h-screen">
+      {/* Header */}
       <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-            <Boxes className="w-8 h-8 text-amber-600" /> Live Inventory & Stock Status
+            <Boxes className="w-8 h-8 text-amber-600" /> Stock Management & Live Inventory
           </h1>
-          <p className="text-xs text-slate-500 mt-1 font-medium">Real-time tracking of product stock availability across distribution channels.</p>
+          <p className="text-xs text-slate-500 mt-1 font-medium">
+            {isAdmin ? 'Admin Portal: Manage live stock levels and replenishment.' : 'Partner Portal: Monitor available inventory and low stock notifications.'}
+          </p>
         </div>
-        <button
-          onClick={fetchLiveStocks}
-          className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-xl text-xs transition cursor-pointer shadow-sm"
-        >
-          Refresh Stock Feed
-        </button>
+        <div className="flex items-center gap-3">
+          {!isAdmin && lowStockCount > 0 && (
+            <Link
+              href="/dashboard/orders"
+              className="px-4 py-2.5 bg-rose-500 hover:bg-rose-600 text-white font-black rounded-xl text-xs flex items-center gap-2 shadow-lg shadow-rose-500/25 transition cursor-pointer animate-pulse"
+            >
+              <ShoppingCart className="w-4 h-4" /> Reorder Low Stock Items
+            </Link>
+          )}
+          <button
+            onClick={fetchLiveStocks}
+            className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold rounded-xl text-xs transition cursor-pointer shadow-sm"
+          >
+            Refresh Feed
+          </button>
+        </div>
       </div>
 
+      {message && (
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold rounded-2xl flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" /> {message}
+        </div>
+      )}
+
+      {/* Low Stock Warning Banner for Partners */}
+      {!isAdmin && lowStockCount > 0 && (
+        <div className="p-5 bg-rose-50 border border-rose-200 text-rose-900 rounded-3xl flex items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-rose-500 text-white rounded-2xl shadow-inner shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-black text-xs uppercase tracking-wider">Low Stock Notification</h4>
+              <p className="text-xs text-rose-700 mt-0.5">{lowStockCount} product(s) are running low or out of stock. Please place a replenishment order.</p>
+            </div>
+          </div>
+          <Link href="/dashboard/orders" className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs transition shrink-0">
+            Order Now
+          </Link>
+        </div>
+      )}
+
+      {/* Search and Category Filters */}
       <div className="bg-white p-5 rounded-3xl border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-4 top-3.5 w-4 h-4 text-slate-400" />
@@ -109,6 +169,7 @@ export default function LiveInventoryStockPage() {
         </div>
       </div>
 
+      {/* Stock Table Grid */}
       <div className="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
         {loading ? (
           <div className="text-center py-20 text-slate-400 text-xs font-bold animate-pulse">Loading live inventory stocks...</div>
@@ -127,7 +188,7 @@ export default function LiveInventoryStockPage() {
                   <th className="p-4">MRP</th>
                   <th className="p-4">Packing Ratio</th>
                   <th className="p-4">GST %</th>
-                  <th className="p-4 pr-6 text-right">Live Stock Status</th>
+                  <th className="p-4 pr-6 text-right">Stock Status & Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
@@ -155,12 +216,26 @@ export default function LiveInventoryStockPage() {
                     </td>
                     <td className="p-4 font-bold text-purple-700">{p.gst_percent || 0}%</td>
                     <td className="p-4 pr-6 text-right">
-                      <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
-                        p.status === 'Out of Stock' ? 'bg-rose-100 text-rose-700 border border-rose-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${p.status === 'Out of Stock' ? 'bg-rose-500' : 'bg-emerald-500'}`}></span>
-                        {p.status || 'In Stock'}
-                      </span>
+                      {isAdmin ? (
+                        <select
+                          value={p.status || 'In Stock'}
+                          onChange={(e) => handleUpdateStockStatus(p.id, e.target.value)}
+                          className={`font-black text-[11px] rounded-xl px-3 py-2 cursor-pointer shadow-sm outline-none transition ${
+                            p.status === 'Out of Stock' ? 'bg-rose-100 text-rose-700 border border-rose-300' : p.status === 'Low Stock' ? 'bg-amber-100 text-amber-800 border border-amber-300' : 'bg-emerald-100 text-emerald-700 border border-emerald-300'
+                          }`}
+                        >
+                          <option value="In Stock">In Stock</option>
+                          <option value="Low Stock">Low Stock</option>
+                          <option value="Out of Stock">Out of Stock</option>
+                        </select>
+                      ) : (
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider inline-flex items-center gap-1 ${
+                          p.status === 'Out of Stock' ? 'bg-rose-100 text-rose-700 border border-rose-200' : p.status === 'Low Stock' ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${p.status === 'Out of Stock' ? 'bg-rose-500' : p.status === 'Low Stock' ? 'bg-amber-500' : 'bg-emerald-500'}`}></span>
+                          {p.status || 'In Stock'}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 ))}
