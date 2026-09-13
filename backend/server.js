@@ -256,6 +256,18 @@ app.post('/api/admin/categories', async (req, res) => {
   }
 });
 
+app.delete('/api/admin/categories/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query("DELETE FROM categories WHERE id = $1 RETURNING *", [id]);
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Category not found' });
+    res.json({ message: 'Category deleted successfully' });
+  } catch (err) {
+    console.error('Delete Category Error:', err);
+    res.status(500).json({ message: 'Failed to delete category' });
+  }
+});
+
 app.get('/api/admin/products', async (req, res) => {
   try {
     const { category } = req.query;
@@ -480,7 +492,6 @@ app.get('/api/orders', async (req, res) => {
   }
 });
 
-// Update Order, items, and status
 app.put('/api/orders/:id', async (req, res) => {
   const { id } = req.params;
   const { items, totalAmount, status } = req.body;
