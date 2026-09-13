@@ -18,6 +18,7 @@ export default function Sidebar({ role }: SidebarProps) {
     { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', icon: ShoppingCart },
     { name: 'Provision Shop / User', href: '/dashboard/users/create', icon: UserPlus },
     { name: 'Advertisement Banners', href: '/dashboard/ads', icon: Megaphone },
+    { name: 'Inventory Stocks', href: '/dashboard/inventory/stocks', icon: Package },
   ];
 
   return (
