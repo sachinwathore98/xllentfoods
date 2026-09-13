@@ -1,7 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Package, DollarSign, Users, ShoppingCart, UserPlus, Megaphone } from 'lucide-react';
+import { LayoutDashboard, Package, DollarSign, Users, ShoppingCart, UserPlus, Megaphone, Boxes } from 'lucide-react';
 
 interface SidebarProps {
   role?: string;
@@ -13,12 +13,12 @@ export default function Sidebar({ role }: SidebarProps) {
   const navItems = [
     { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard },
     { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package },
+    { name: 'Inventory Stocks', href: '/dashboard/inventory/stocks', icon: Boxes },
     { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign },
     { name: 'Partnership Enquiries', href: '/dashboard/enquiries', icon: Users },
     { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', icon: ShoppingCart },
     { name: 'Provision Shop / User', href: '/dashboard/users/create', icon: UserPlus },
     { name: 'Advertisement Banners', href: '/dashboard/ads', icon: Megaphone },
-    { name: 'Inventory Stocks', href: '/dashboard/inventory/stocks', icon: Package },
   ];
 
   return (
