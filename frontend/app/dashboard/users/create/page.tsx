@@ -38,6 +38,7 @@ export default function CreateAndManageUsersPage() {
   const [editPhone, setEditPhone] = useState('');
   const [editLocation, setEditLocation] = useState('');
   const [editGstNumber, setEditGstNumber] = useState('');
+  const [editRole, setEditRole] = useState('shop');
   const [editPassword, setEditPassword] = useState('');
 
   useEffect(() => {
@@ -70,23 +71,18 @@ export default function CreateAndManageUsersPage() {
 
   const getFilteredParents = () => {
     if (role === 'admin') {
-      // Admin -> Only Superadmin (no other admin)
       return parentsList.filter(p => p.role === 'superadmin');
     }
     if (role === 'super_stockist') {
-      // Super Stockist -> Admin or Superadmin
       return parentsList.filter(p => p.role === 'admin' || p.role === 'superadmin');
     }
     if (role === 'distributor') {
-      // Distributor -> Super Stockist, Admin, or Superadmin
       return parentsList.filter(p => p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
     if (role === 'shop') {
-      // Retail Shop -> Distributor preferred, fallback/allow Super Stockist, Admin, or Superadmin if no distributor
       return parentsList.filter(p => p.role === 'distributor' || p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
     if (role === 'employee') {
-      // Field Employee -> Distributor, Super Stockist, Admin, or Superadmin
       return parentsList.filter(p => p.role === 'distributor' || p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
     return parentsList;
@@ -166,6 +162,7 @@ export default function CreateAndManageUsersPage() {
     setEditPhone(user.phone || '');
     setEditLocation(user.location || '');
     setEditGstNumber(user.gst_number || '');
+    setEditRole(user.role || 'shop');
     setEditPassword('');
   };
 
@@ -180,9 +177,10 @@ export default function CreateAndManageUsersPage() {
         phone: editPhone,
         location: editLocation,
         gstNumber: editGstNumber,
+        role: editRole,
         password: editPassword
       });
-      setMessage('User profile updated successfully!');
+      setMessage('User profile and role updated successfully!');
       setEditingUser(null);
       if (currentUser) {
         fetchDownlineUsers(currentUser.id, currentUser.role);
@@ -431,6 +429,20 @@ export default function CreateAndManageUsersPage() {
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Email Address</label>
                 <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} required className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Role Tier</label>
+                <select
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-900 outline-none bg-white cursor-pointer"
+                >
+                  <option value="admin">Admin</option>
+                  <option value="super_stockist">Super Stockist</option>
+                  <option value="distributor">Distributor</option>
+                  <option value="shop">Retail Shop</option>
+                  <option value="employee">Field Employee</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number</label>

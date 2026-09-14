@@ -619,18 +619,26 @@ app.post('/api/admin/users/create', async (req, res) => {
 app.put('/api/admin/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, location, gstNumber, password } = req.body;
+    const { name, email, phone, location, gstNumber, role, password } = req.body;
+    
     if (password && password.trim() !== '') {
       const hashedPassword = await bcrypt.hash(password, 10);
-      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4, gst_number = $5, password = $6 WHERE id = $7 RETURNING id, name, email, role, gst_number`, [name, email, phone, location, gstNumber || null, hashedPassword, id]);
+      const result = await pool.query(
+        `UPDATE users SET name = $1, email = $2, phone = $3, location = $4, gst_number = $5, role = $6, password = $7 WHERE id = $8 RETURNING id, name, email, role, gst_number`,
+        [name, email, phone, location, gstNumber || null, role, hashedPassword, id]
+      );
       if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
       return res.json({ message: 'User updated successfully', user: result.rows[0] });
     } else {
-      const result = await pool.query(`UPDATE users SET name = $1, email = $2, phone = $3, location = $4, gst_number = $5 WHERE id = $6 RETURNING id, name, email, role, gst_number`, [name, email, phone, location, gstNumber || null, id]);
+      const result = await pool.query(
+        `UPDATE users SET name = $1, email = $2, phone = $3, location = $4, gst_number = $5, role = $6 WHERE id = $7 RETURNING id, name, email, role, gst_number`,
+        [name, email, phone, location, gstNumber || null, role, id]
+      );
       if (result.rows.length === 0) return res.status(404).json({ message: 'User not found' });
       return res.json({ message: 'User updated successfully', user: result.rows[0] });
     }
   } catch (err) {
+    console.error('Update User Error:', err);
     res.status(500).json({ message: 'Failed to update user' });
   }
 });
