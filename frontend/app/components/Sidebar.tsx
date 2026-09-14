@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { LayoutDashboard, Package, Boxes, DollarSign, Users, ShoppingCart, UserPlus, Megaphone, ChevronRight } from 'lucide-react';
+import { LayoutDashboard, Package, Boxes, DollarSign, Users, ShoppingCart, UserPlus, Megaphone } from 'lucide-react';
 
 interface SidebarProps {
   role?: string;
@@ -12,16 +12,19 @@ export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  const navItems = [
-    { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard },
-    { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package },
-    { name: 'Stock Management', href: '/dashboard/inventory/stocks', icon: Boxes },
-    { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign },
-    { name: 'Partnership Enquiries', href: '/dashboard/enquiries', icon: Users },
-    { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', icon: ShoppingCart },
-    { name: 'Provision Shop / User', href: '/dashboard/users/create', icon: UserPlus },
-    { name: 'Advertisement Banners', href: '/dashboard/ads', icon: Megaphone },
+  // Role-Specific Navigation Matrix matching the access rules
+  const allNavItems = [
+    { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Stock Management', href: '/dashboard/inventory/stocks', icon: Boxes, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
+    { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Partnership Enquiries', href: '/dashboard/enquiries', icon: Users, roles: ['superadmin', 'admin'] },
+    { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', icon: ShoppingCart, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
+    { name: 'Provision Shop / User', href: '/dashboard/users/create', icon: UserPlus, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'employee'] },
+    { name: 'Advertisement Banners', href: '/dashboard/ads', icon: Megaphone, roles: ['superadmin', 'admin'] },
   ];
+
+  const filteredNavItems = allNavItems.filter(item => !role || item.roles.includes(role));
 
   return (
     <aside 
@@ -38,12 +41,12 @@ export default function Sidebar({ role }: SidebarProps) {
           </div>
           <div className={`transition-opacity duration-300 whitespace-nowrap overflow-hidden ${isExpanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
             <h2 className="text-base font-black text-white tracking-tight leading-none">Xllent Foods</h2>
-            <p className="text-[9px] text-amber-500 uppercase tracking-widest mt-1 font-extrabold">DMS Portal</p>
+            <p className="text-[9px] text-amber-500 uppercase tracking-widest mt-1 font-extrabold">Portal: {role || 'User'}</p>
           </div>
         </div>
 
         <nav className="space-y-1.5">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = pathname === item.href;
             return (
@@ -62,7 +65,7 @@ export default function Sidebar({ role }: SidebarProps) {
                   {item.name}
                 </span>
 
-                {/* Tooltip for collapsed mode */}
+                {/* Floating Tooltip for Collapsed Mode */}
                 {!isExpanded && (
                   <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl shadow-2xl opacity-0 group-hover/item:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 border border-slate-700">
                     {item.name}
@@ -75,10 +78,10 @@ export default function Sidebar({ role }: SidebarProps) {
       </div>
 
       <div className="p-4 sm:p-5 border-t border-slate-900/80 space-y-3 overflow-hidden bg-slate-950/50 backdrop-blur-md">
-        <div className={`transition-opacity duration-300 ${isExpanded ? 'opacity-150' : 'opacity-0 h-0 overflow-hidden'}`}>
+        <div className={`transition-opacity duration-300 ${isExpanded ? 'opacity-100' : 'opacity-0 h-0 overflow-hidden'}`}>
           <div className="px-3 py-2 bg-slate-900/80 rounded-xl border border-slate-800/80">
-            <span className="text-[9px] uppercase font-bold text-slate-500 block">Active Session</span>
-            <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">{role || 'Admin'}</span>
+            <span className="text-[9px] uppercase font-bold text-slate-500 block">Active Status</span>
+            <span className="text-xs font-extrabold text-amber-400 uppercase tracking-wider">{role || 'Authenticated'}</span>
           </div>
         </div>
         <button
