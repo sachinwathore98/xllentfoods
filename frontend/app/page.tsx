@@ -248,12 +248,12 @@ export default function HomePage() {
           ) : (
             <div>
               {filteredProducts.map((product, index) => {
-                const isGridStart = index % 10 === 0;
-                const gridChunk = filteredProducts.slice(index, index + 10);
+                const isGridStart = index % 12 === 0; // Updated from 10 to 12
+                const gridChunk = filteredProducts.slice(index, index + 12); // Updated chunk size to 12
 
                 if (!isGridStart) return null;
 
-                const chunkCycleIndex = Math.floor(index / 10);
+                const chunkCycleIndex = Math.floor(index / 12); // Updated divisor to 12
                 const isCategoryTicker = chunkCycleIndex % 2 === 0;
                 const tickerProductsSlice = products.slice((chunkCycleIndex * 5) % Math.max(1, products.length - 5), ((chunkCycleIndex * 5) % Math.max(1, products.length - 5)) + 6);
 
