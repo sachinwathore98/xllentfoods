@@ -841,3 +841,103 @@ app.put('/api/orders/:id/status', async (req, res) => {
     res.status(500).json({ message: 'Failed to update order status' });
   }
 });
+// --- ROBUST AUTOMATED INVENTORY MOVEMENT ON ORDER COMPLETION ---
+async function applyInventoryMovement(orderId, newStatus) {
+  try {
+    const orderRes = await pool.query("SELECT * FROM orders WHERE id = $1", [orderId]);
+    if (orderRes.rows.length === 0) return;
+    const order = orderRes.rows[0];
+
+    // Only process inventory when status is explicitly Completed or Approved
+    if (newStatus !== 'Approved' && newStatus !== 'Completed') return;
+
+    const itemsRes = await pool.query("SELECT * FROM order_items WHERE order_id = $1", [orderId]);
+    const items = itemsRes.rows;
+
+    const buyerRes = await pool.query("SELECT * FROM users WHERE id = $1", [order.buyer_id]);
+    const sellerRes = await pool.query("SELECT * FROM users WHERE id = $1", [order.seller_id]);
+
+    if (buyerRes.rows.length === 0) return;
+    const buyer = buyerRes.rows[0];
+    const seller = sellerRes.rows.length > 0 ? sellerRes.rows[0] : null;
+
+    for (let item of items) {
+      // 1. If buyer is Super Stockist buying from Admin/Super Admin -> Increase Super Stockist stock
+      if (buyer.role === 'super_stockist' && (!seller || seller.role === 'admin' || seller.role === 'superadmin')) {
+        await pool.query(`
+          INSERT INTO partner_inventories (user_id, product_id, quantity, status)
+          VALUES ($1, $2, $3, 'In Stock')
+          ON CONFLICT (user_id, product_id)
+          DO UPDATE SET quantity = partner_inventories.quantity + $3
+        `, [buyer.id, item.product_id, item.quantity]);
+      }
+
+      // 2. If seller is Super Stockist selling to Distributor/Shop -> Decrease Super Stockist stock
+      if (seller && seller.role === 'super_stockist') {
+        await pool.query(`
+          INSERT INTO partner_inventories (user_id, product_id, quantity, status)
+          VALUES ($1, $2, GREATEST(0, -$3), 'In Stock')
+          ON CONFLICT (user_id, product_id)
+          DO UPDATE SET quantity = GREATEST(0, partner_inventories.quantity - $3)
+        `, [seller.id, item.product_id, item.quantity]);
+      }
+    }
+  } catch (err) {
+    console.error('Inventory Movement Error:', err);
+  }
+}
+
+// Hook into order status update endpoint
+app.put('/api/orders/:id/status', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+    
+    // Trigger live inventory adjustment
+    await applyInventoryMovement(id, status);
+
+    res.json({ success: true, message: 'Order status updated and live inventory synchronized' });
+  } catch (err) {
+    console.error('Update Order Status Error:', err);
+    res.status(500).json({ message: 'Failed to update order status' });
+  }
+});
+
+// Hook into general order update endpoint as well
+app.put('/api/orders/:id', async (req, res) => {
+  const { id } = req.params;
+  const { items, totalAmount, status } = req.body;
+  try {
+    if (status !== undefined || totalAmount !== undefined) {
+      await pool.query(
+        "UPDATE orders SET status = COALESCE($1, status), total_amount = COALESCE($2, total_amount) WHERE id = $3",
+        [status, totalAmount, id]
+      );
+    }
+
+    if (items && Array.isArray(items)) {
+      await pool.query("DELETE FROM order_items WHERE order_id = $1", [id]);
+      for (let item of items) {
+        const prodId = item.productId || item.product_id;
+        const qty = item.quantity;
+        const price = item.unitPrice || item.unit_price;
+        if (prodId && qty) {
+          await pool.query(
+            "INSERT INTO order_items (order_id, product_id, quantity, unit_price) VALUES ($1, $2, $3, $4)",
+            [id, prodId, qty, price || 0]
+          );
+        }
+      }
+    }
+
+    if (status) {
+      await applyInventoryMovement(id, status);
+    }
+
+    res.json({ success: true, message: 'Order successfully updated and inventory synchronized' });
+  } catch (err) {
+    console.error('Update Order Error:', err);
+    res.status(500).json({ error: `Failed to update order in database: ${err.message}` });
+  }
+});
