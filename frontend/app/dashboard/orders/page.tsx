@@ -1,17 +1,21 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package, Search, Calendar, Edit3, Filter } from 'lucide-react';
+import { ShoppingCart, Plus, FileText, X, Trash2, Download, Package, Search, Calendar, Edit3, Filter, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import jsPDF from 'jspdf';
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
   const [downlineUsers, setDownlineUsers] = useState<any[]>([]);
+  const [upstreamVendors, setUpstreamVendors] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [partnerPricing, setPartnerPricing] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+
+  // Super Stockist Mode State
+  const [orderMode, setOrderMode] = useState<'upstream' | 'downstream'>('downstream');
 
   // Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -19,7 +23,7 @@ export default function AdminOrdersPage() {
 
   // Modal States
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [selectedBuyerId, setSelectedBuyerId] = useState('');
+  const [selectedTargetId, setSelectedTargetId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [orderItems, setOrderItems] = useState<{ productId: number; name: string; sku?: string; category: string; quantity: number; unitPrice: number; gstPercent: number }[]>([]);
   
@@ -39,7 +43,7 @@ export default function AdminOrdersPage() {
       const u = JSON.parse(userStr);
       setCurrentUser(u);
       fetchOrders(u.id, u.role);
-      fetchDownlineUsers(u.id, u.role);
+      fetchPartnersAndVendors(u.id, u.role);
     }
     fetchProducts();
     fetchCategories();
@@ -57,12 +61,19 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const fetchDownlineUsers = async (userId: string, role: string) => {
+  const fetchPartnersAndVendors = async (userId: string, role: string) => {
     try {
       const res = await API.get(`/api/admin/downline-users?userId=${userId}&role=${role}`);
-      setDownlineUsers(res.data.users || []);
+      const allUsers = res.data.users || [];
+      
+      // Downstream partners (Distributors, Shops, Employees)
+      setDownlineUsers(allUsers.filter((u: any) => u.id !== Number(userId)));
+
+      // Upstream vendors (Admins / Superadmins)
+      const upVendors = allUsers.filter((u: any) => u.role === 'admin' || u.role === 'superadmin' || u.role === 'superadmin@xllentfoods.com');
+      setUpstreamVendors(upVendors.length > 0 ? upVendors : [{ id: 1, name: 'Xllent Foods Central Admin', role: 'admin' }]);
     } catch (err) {
-      console.error('Failed to fetch downline users', err);
+      console.error('Failed to fetch network partners', err);
     }
   };
 
@@ -84,14 +95,14 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const handlePartnerSelect = async (buyerId: string) => {
-    setSelectedBuyerId(buyerId);
-    if (!buyerId) {
+  const handleTargetSelect = async (targetId: string) => {
+    setSelectedTargetId(targetId);
+    if (!targetId || orderMode === 'upstream') {
       setPartnerPricing([]);
       return;
     }
     try {
-      const res = await API.get(`/api/downline-pricing/${buyerId}`);
+      const res = await API.get(`/api/downline-pricing/${targetId}`);
       setPartnerPricing(res.data.pricing || []);
     } catch (err) {
       console.error('Failed to fetch partner pricing', err);
@@ -138,8 +149,17 @@ export default function AdminOrdersPage() {
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedBuyerId || orderItems.length === 0) {
-      alert('Please select a downstream partner and add at least one product with quantity.');
+    if (orderItems.length === 0) {
+      alert('Please add at least one product with quantity.');
+      return;
+    }
+
+    const targetId = orderMode === 'upstream' 
+      ? Number(selectedTargetId || upstreamVendors[0]?.id || 1) 
+      : Number(selectedTargetId);
+
+    if (!targetId) {
+      alert('Please select a target partner or vendor.');
       return;
     }
 
@@ -149,17 +169,17 @@ export default function AdminOrdersPage() {
 
     try {
       await API.post('/api/orders/smart', {
-        buyerId: selectedBuyerId,
+        buyerId: orderMode === 'upstream' ? currentUser.id : targetId,
         items: orderItems,
         totalAmount,
-        proxyForId: currentUser.id
+        proxyForId: orderMode === 'upstream' ? targetId : currentUser.id
       });
       setIsCreateModalOpen(false);
       setOrderItems([]);
-      setSelectedBuyerId('');
+      setSelectedTargetId('');
       setPartnerPricing([]);
       fetchOrders(currentUser.id, currentUser.role);
-      alert('Order successfully created for the selected partner and synced to dashboard!');
+      alert(orderMode === 'upstream' ? 'Replenishment order successfully placed to Uplink!' : 'Invoice & Downstream order successfully generated!');
     } catch (err) {
       console.error('Create Order Error', err);
       alert('Failed to create order.');
@@ -340,8 +360,8 @@ export default function AdminOrdersPage() {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(8);
       pdf.setTextColor(100, 116, 139);
-      pdf.text('BILLED TO (SELECTED PARTNER / VENDOR)', 20, 71);
-      pdf.text('FULFILLED BY (UPLINE HUB)', 110, 71);
+      pdf.text('BILLED TO (PARTNER / BUYER)', 20, 71);
+      pdf.text('FULFILLED BY (SELLER / UPLINE)', 110, 71);
 
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
@@ -456,6 +476,8 @@ export default function AdminOrdersPage() {
     return matchesSearch && matchesStatus;
   });
 
+  const isSuperStockist = currentUser?.role === 'super_stockist';
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
       {/* Header Section */}
@@ -467,10 +489,13 @@ export default function AdminOrdersPage() {
           </p>
         </div>
         <button
-          onClick={() => setIsCreateModalOpen(true)}
+          onClick={() => {
+            setOrderMode(isSuperStockist ? 'downstream' : 'downstream');
+            setIsCreateModalOpen(true);
+          }}
           className="px-5 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs flex items-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer shrink-0"
         >
-          <Plus className="w-4 h-4" /> Create Order for Partner
+          <Plus className="w-4 h-4" /> {isSuperStockist ? 'New Order / Invoice' : 'Create Order for Partner'}
         </button>
       </div>
 
@@ -596,7 +621,7 @@ export default function AdminOrdersPage() {
         )}
       </div>
 
-      {/* Edit Order Modal with Category Catalog & Photos */}
+      {/* Edit Order Modal */}
       {editingOrder && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
@@ -708,31 +733,78 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Create Order Modal */}
+      {/* Create Order Modal with Super Stockist Dual Workflow */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
             <div className="flex justify-between items-center border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-black text-slate-900">Create Order for Downline Partner</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Rates automatically apply per partner pricing structure (Packet/Carton & GST).</p>
+                <h3 className="text-lg font-black text-slate-900">{isSuperStockist ? 'Smart Order & Billing Hub' : 'Create Order for Downline Partner'}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  {isSuperStockist ? 'Choose between upstream replenishment or downstream invoicing.' : 'Rates automatically apply per partner pricing structure (Packet/Carton & GST).'}
+                </p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
 
             <form onSubmit={handleCreateOrder} className="space-y-6">
+              {/* Dual Mode Switcher for Super Stockist */}
+              {isSuperStockist && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <button
+                    type="button"
+                    onClick={() => { setOrderMode('upstream'); setSelectedTargetId(''); setPartnerPricing([]); }}
+                    className={`p-4 rounded-2xl border text-left transition cursor-pointer flex items-center gap-3.5 ${
+                      orderMode === 'upstream' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-800 border-slate-200 hover:border-amber-400'
+                    }`}
+                  >
+                    <div className={`p-2.5 rounded-xl ${orderMode === 'upstream' ? 'bg-amber-500 text-slate-950' : 'bg-amber-50 text-amber-600'}`}>
+                      <ArrowUpRight className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xs">1. Order from Uplink (Admin / Super Admin)</h4>
+                      <p className={`text-[9px] mt-0.5 ${orderMode === 'upstream' ? 'text-slate-300' : 'text-slate-500'}`}>Replenish warehouse stock upwards</p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => { setOrderMode('downstream'); setSelectedTargetId(''); setPartnerPricing([]); }}
+                    className={`p-4 rounded-2xl border text-left transition cursor-pointer flex items-center gap-3.5 ${
+                      orderMode === 'downstream' ? 'bg-slate-900 text-white border-slate-900 shadow-md' : 'bg-white text-slate-800 border-slate-200 hover:border-amber-400'
+                    }`}
+                  >
+                    <div className={`p-2.5 rounded-xl ${orderMode === 'downstream' ? 'bg-amber-500 text-slate-950' : 'bg-blue-50 text-blue-600'}`}>
+                      <ArrowDownLeft className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-xs">2. Fulfill Downstream & Bill</h4>
+                      <p className={`text-[9px] mt-0.5 ${orderMode === 'downstream' ? 'text-slate-300' : 'text-slate-500'}`}>Create invoice for Distributors or Shops</p>
+                    </div>
+                  </button>
+                </div>
+              )}
+
               <div>
-                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">Select Downline Partner Account (Super Stockist, Distributor, Shop)</label>
+                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider mb-2">
+                  {orderMode === 'upstream' ? 'Select Upstream Vendor (Admin / Super Admin)' : 'Select Downline Partner Account (Distributor, Retail Shop)'}
+                </label>
                 <select
-                  value={selectedBuyerId}
-                  onChange={(e) => handlePartnerSelect(e.target.value)}
+                  value={selectedTargetId}
+                  onChange={(e) => handleTargetSelect(e.target.value)}
                   required
                   className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3 text-xs text-slate-900 font-bold focus:outline-none focus:border-amber-500 focus:bg-white transition cursor-pointer"
                 >
                   <option value="">-- Choose Partner / Vendor --</option>
-                  {downlineUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role.toUpperCase()}) — {u.location || 'Territory N/A'}</option>
-                  ))}
+                  {orderMode === 'upstream' ? (
+                    upstreamVendors.map((v) => (
+                      <option key={v.id} value={v.id}>{v.name} ({v.role.toUpperCase()})</option>
+                    ))
+                  ) : (
+                    downlineUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.role.toUpperCase()}) — {u.location || 'Territory N/A'}</option>
+                    ))
+                  )}
                 </select>
               </div>
 
@@ -829,7 +901,9 @@ export default function AdminOrdersPage() {
 
               <div className="flex justify-end gap-3 pt-2 border-t border-slate-100">
                 <button type="button" onClick={() => setIsCreateModalOpen(false)} className="px-5 py-3 bg-slate-100 text-slate-600 font-bold rounded-2xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
-                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">Confirm & Place Order</button>
+                <button type="submit" className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-2xl text-xs shadow-lg shadow-amber-500/20 transition cursor-pointer">
+                  {orderMode === 'upstream' ? 'Submit Replenishment Order' : 'Generate Bill & Invoice'}
+                </button>
               </div>
             </form>
           </div>
