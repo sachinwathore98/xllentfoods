@@ -46,6 +46,10 @@ export default function CreateAndManageUsersPage() {
     if (userStr) {
       const u = JSON.parse(userStr);
       setCurrentUser(u);
+      // If regular admin defaults to shop if current role selection is restricted
+      if (u.role === 'admin' && role === 'admin') {
+        setRole('super_stockist');
+      }
       fetchDownlineUsers(u.id, u.role);
     }
     fetchPotentialParents();
@@ -62,7 +66,7 @@ export default function CreateAndManageUsersPage() {
 
   const fetchPotentialParents = async () => {
     try {
-      const res = await API.get('/api/admin/users-list');
+      const res = await API.get(`/api/admin/users-list`);
       setParentsList(res.data.users || []);
     } catch (err) {
       console.error('Failed to load parent hierarchy', err);
@@ -79,10 +83,7 @@ export default function CreateAndManageUsersPage() {
     if (role === 'distributor') {
       return parentsList.filter(p => p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
-    if (role === 'shop') {
-      return parentsList.filter(p => p.role === 'distributor' || p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
-    }
-    if (role === 'employee') {
+    if (role === 'shop' || role === 'employee') {
       return parentsList.filter(p => p.role === 'distributor' || p.role === 'super_stockist' || p.role === 'admin' || p.role === 'superadmin');
     }
     return parentsList;
@@ -170,6 +171,12 @@ export default function CreateAndManageUsersPage() {
     e.preventDefault();
     if (!editingUser) return;
 
+    // Prevent regular admin from promoting anyone to admin
+    if (currentUser?.role === 'admin' && editRole === 'admin') {
+      alert('Admins are not authorized to assign or convert accounts to Admin tier.');
+      return;
+    }
+
     try {
       await API.put(`/api/admin/users/${editingUser.id}`, {
         name: editName,
@@ -205,6 +212,7 @@ export default function CreateAndManageUsersPage() {
     }
   };
 
+  const isSuperAdmin = currentUser?.role === 'superadmin' || currentUser?.role === 'superadmin@xllentfoods.com';
   const filteredParents = getFilteredParents();
 
   return (
@@ -274,7 +282,7 @@ export default function CreateAndManageUsersPage() {
                 onChange={(e) => handleRoleChange(e.target.value)}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-amber-500 bg-white"
               >
-                <option value="admin">Admin</option>
+                {isSuperAdmin && <option value="admin">Admin</option>}
                 <option value="super_stockist">Super Stockist</option>
                 <option value="distributor">Distributor</option>
                 <option value="shop">Retail Shop</option>
@@ -437,7 +445,7 @@ export default function CreateAndManageUsersPage() {
                   onChange={(e) => setEditRole(e.target.value)}
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900 outline-none focus:border-amber-500 bg-white cursor-pointer shadow-sm"
                 >
-                  <option value="admin">Admin</option>
+                  {isSuperAdmin && <option value="admin">Admin</option>}
                   <option value="super_stockist">Super Stockist</option>
                   <option value="distributor">Distributor</option>
                   <option value="shop">Retail Shop</option>
