@@ -12,7 +12,6 @@ export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Role-Specific Navigation Matrix matching the access rules
   const allNavItems = [
     { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
     { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
@@ -36,8 +35,8 @@ export default function Sidebar({ role }: SidebarProps) {
     >
       <div className="p-4 sm:p-5 space-y-6 overflow-hidden">
         <div className="flex items-center gap-3 px-1">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center font-black text-slate-950 shadow-lg shadow-amber-600/30 shrink-0">
-            XF
+          <div className="w-10 h-10 rounded-2xl bg-white/10 p-1.5 flex items-center justify-center shrink-0 border border-slate-800 shadow-inner">
+            <img src="/images/logo.png" alt="Xllent Foods Logo" className="w-full h-full object-contain" />
           </div>
           <div className={`transition-opacity duration-300 whitespace-nowrap overflow-hidden ${isExpanded ? 'opacity-100' : 'opacity-0 w-0'}`}>
             <h2 className="text-base font-black text-white tracking-tight leading-none">Xllent Foods</h2>
@@ -65,7 +64,6 @@ export default function Sidebar({ role }: SidebarProps) {
                   {item.name}
                 </span>
 
-                {/* Floating Tooltip for Collapsed Mode */}
                 {!isExpanded && (
                   <div className="absolute left-full ml-3 px-3 py-1.5 bg-slate-900 text-white text-xs font-bold rounded-xl shadow-2xl opacity-0 group-hover/item:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50 border border-slate-700">
                     {item.name}
