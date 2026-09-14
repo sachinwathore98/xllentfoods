@@ -46,7 +46,6 @@ export default function CreateAndManageUsersPage() {
     if (userStr) {
       const u = JSON.parse(userStr);
       setCurrentUser(u);
-      // If regular admin defaults to shop if current role selection is restricted
       if (u.role === 'admin' && role === 'admin') {
         setRole('super_stockist');
       }
@@ -157,6 +156,11 @@ export default function CreateAndManageUsersPage() {
   };
 
   const openEditModal = (user: UserProfile) => {
+    // Block regular admin from editing other admin accounts
+    if (!isSuperAdmin && user.role === 'admin') {
+      alert('You are not authorized to edit Admin accounts.');
+      return;
+    }
     setEditingUser(user);
     setEditName(user.name);
     setEditEmail(user.email);
@@ -171,8 +175,7 @@ export default function CreateAndManageUsersPage() {
     e.preventDefault();
     if (!editingUser) return;
 
-    // Prevent regular admin from promoting anyone to admin
-    if (currentUser?.role === 'admin' && editRole === 'admin') {
+    if (!isSuperAdmin && editRole === 'admin') {
       alert('Admins are not authorized to assign or convert accounts to Admin tier.');
       return;
     }
@@ -198,7 +201,11 @@ export default function CreateAndManageUsersPage() {
     }
   };
 
-  const handleDeleteUser = async (userId: number) => {
+  const handleDeleteUser = async (userId: number, userRole: string) => {
+    if (!isSuperAdmin && userRole === 'admin') {
+      alert('You are not authorized to delete Admin accounts.');
+      return;
+    }
     if (!confirm('Are you sure you want to delete this user account?')) return;
     try {
       await API.delete(`/api/admin/users/${userId}`);
@@ -382,40 +389,53 @@ export default function CreateAndManageUsersPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {downlineUsers.map(u => (
-              <div key={u.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-[10px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg uppercase">
-                      {u.role.replace('_', ' ')}
-                    </span>
-                  </div>
-                  <h3 className="font-bold text-base text-slate-900">{u.name}</h3>
-                  
-                  <div className="space-y-1 pt-2 text-xs text-slate-500">
-                    <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-slate-400" /> {u.email}</p>
-                    {u.phone && <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /> {u.phone}</p>}
-                    {u.gst_number && <p className="font-mono text-[11px] text-amber-700 font-bold">GSTIN: {u.gst_number}</p>}
-                    {u.location && <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {u.location}</p>}
-                  </div>
-                </div>
+            {downlineUsers.map(u => {
+              const isTargetAdmin = u.role === 'admin';
+              const canModify = isSuperAdmin || !isTargetAdmin;
 
-                <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => openEditModal(u)}
-                    className="w-1/2 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" /> Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteUser(u.id)}
-                    className="w-1/2 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-rose-200"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
-                  </button>
+              return (
+                <div key={u.id} className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-bold px-2.5 py-1 bg-amber-100 text-amber-800 rounded-lg uppercase">
+                        {u.role.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <h3 className="font-bold text-base text-slate-900">{u.name}</h3>
+                    
+                    <div className="space-y-1 pt-2 text-xs text-slate-500">
+                      <p className="flex items-center gap-2"><Mail className="w-3.5 h-3.5 text-slate-400" /> {u.email}</p>
+                      {u.phone && <p className="flex items-center gap-2"><Phone className="w-3.5 h-3.5 text-slate-400" /> {u.phone}</p>}
+                      {u.gst_number && <p className="font-mono text-[11px] text-amber-700 font-bold">GSTIN: {u.gst_number}</p>}
+                      {u.location && <p className="flex items-center gap-2"><MapPin className="w-3.5 h-3.5 text-slate-400" /> {u.location}</p>}
+                    </div>
+                  </div>
+
+                  {canModify ? (
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        onClick={() => openEditModal(u)}
+                        className="w-1/2 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" /> Edit
+                      </button>
+                      <button
+                        onClick={() => handleDeleteUser(u.id, u.role)}
+                        className="w-1/2 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1 cursor-pointer border border-rose-200"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" /> Delete
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="pt-2">
+                      <span className="block text-center py-2 bg-slate-100 text-slate-400 rounded-xl text-[11px] font-bold">
+                        Protected Admin Account
+                      </span>
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
