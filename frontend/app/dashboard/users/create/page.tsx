@@ -414,28 +414,28 @@ export default function CreateAndManageUsersPage() {
 
       {/* Edit User Modal */}
       {editingUser && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white p-8 rounded-3xl max-w-lg w-full space-y-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in duration-200">
-            <div className="flex justify-between items-center border-b border-slate-100 pb-4">
-              <h3 className="font-bold text-lg text-slate-900">Edit Partner: {editingUser.name}</h3>
-              <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600"><X className="w-5 h-5" /></button>
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white p-6 sm:p-8 rounded-3xl max-w-lg w-full space-y-5 shadow-2xl border border-slate-200 my-8 max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 shrink-0">
+              <h3 className="font-black text-base text-slate-900">Edit Partner: {editingUser.name}</h3>
+              <button onClick={() => setEditingUser(null)} className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"><X className="w-5 h-5" /></button>
             </div>
 
-            <form onSubmit={handleUpdateUser} className="space-y-4">
+            <form onSubmit={handleUpdateUser} className="space-y-4 overflow-y-auto pr-1 flex-grow">
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Full Name</label>
-                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+                <label className="block text-[11px] font-black text-slate-600 uppercase mb-1">Full Name</label>
+                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-amber-500 shadow-inner" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Email Address</label>
-                <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} required className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+                <label className="block text-[11px] font-black text-slate-600 uppercase mb-1">Email Address</label>
+                <input type="email" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-amber-500 shadow-inner" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Role Tier</label>
+                <label className="block text-[11px] font-black text-slate-600 uppercase mb-1">Role Tier</label>
                 <select
                   value={editRole}
                   onChange={(e) => setEditRole(e.target.value)}
-                  className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs font-bold text-slate-900 outline-none bg-white cursor-pointer"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-900 outline-none focus:border-amber-500 bg-white cursor-pointer shadow-sm"
                 >
                   <option value="admin">Admin</option>
                   <option value="super_stockist">Super Stockist</option>
@@ -445,25 +445,25 @@ export default function CreateAndManageUsersPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Phone Number</label>
-                <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+                <label className="block text-[11px] font-black text-slate-600 uppercase mb-1">Phone Number</label>
+                <input type="text" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-amber-500 shadow-inner" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">GST Number (Optional)</label>
-                <input type="text" value={editGstNumber} onChange={(e) => setEditGstNumber(e.target.value)} placeholder="e.g. 27AAAAA0000A1Z5" className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+                <label className="block text-[11px] font-black text-slate-600 uppercase mb-1">GST Number (Optional)</label>
+                <input type="text" value={editGstNumber} onChange={(e) => setEditGstNumber(e.target.value)} placeholder="e.g. 27AAAAA0000A1Z5" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-amber-500 shadow-inner" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">Location / Address</label>
-                <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border rounded-xl text-xs outline-none" />
+                <label className="block text-[11px] font-black text-slate-600 uppercase mb-1">Location / Address</label>
+                <input type="text" value={editLocation} onChange={(e) => setEditLocation(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-amber-500 shadow-inner" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-amber-700 uppercase mb-1">New Password (Leave blank to keep current)</label>
-                <input type="text" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Enter new password if changing" className="w-full px-4 py-2.5 bg-amber-50 border border-amber-300 rounded-xl text-xs outline-none font-bold" />
+                <label className="block text-[11px] font-black text-amber-700 uppercase mb-1">New Password (Leave blank to keep current)</label>
+                <input type="text" value={editPassword} onChange={(e) => setEditPassword(e.target.value)} placeholder="Enter new password if changing" className="w-full px-4 py-3 bg-amber-50/60 border border-amber-300 rounded-xl text-xs font-bold text-amber-900 outline-none shadow-inner" />
               </div>
 
-              <div className="flex gap-3 pt-4">
-                <button type="button" onClick={() => setEditingUser(null)} className="w-1/2 py-3 bg-slate-100 text-slate-700 font-bold rounded-xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
-                <button type="submit" className="w-1/2 py-3 bg-amber-600 text-white font-bold rounded-xl text-xs hover:bg-amber-700 transition cursor-pointer shadow-lg shadow-amber-600/20">Save Changes</button>
+              <div className="flex gap-3 pt-4 border-t border-slate-100 shrink-0">
+                <button type="button" onClick={() => setEditingUser(null)} className="w-1/2 py-3 bg-slate-100 text-slate-700 font-extrabold rounded-xl text-xs hover:bg-slate-200 transition cursor-pointer">Cancel</button>
+                <button type="submit" className="w-1/2 py-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black rounded-xl text-xs transition shadow-lg shadow-amber-500/20 cursor-pointer">Save Changes</button>
               </div>
             </form>
           </div>
