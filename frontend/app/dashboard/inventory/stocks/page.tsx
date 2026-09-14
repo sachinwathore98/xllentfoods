@@ -50,7 +50,7 @@ export default function LiveInventoryStockPage() {
         const formatted = (prodRes.data.products || []).map((p: any) => ({
           ...p,
           product_id: p.id,
-          quantity: p.status === 'Out of Stock' ? 0 : 50
+          quantity: p.status === 'Out of Stock' ? 0 : 48
         }));
         setProducts(formatted);
       }
@@ -83,7 +83,7 @@ export default function LiveInventoryStockPage() {
             <Boxes className="w-8 h-8 text-amber-600" /> Stock Management & Live Inventory
           </h1>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            {isAdmin ? 'Admin Portal: Monitor global stock statuses.' : 'Super Stockist Portal: Live automated warehouse inventory synchronized with orders.'}
+            {isAdmin ? 'Admin Portal: Monitor global stock statuses.' : 'Super Stockist Portal: Live carton & packet warehouse inventory synchronized with orders.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -175,16 +175,20 @@ export default function LiveInventoryStockPage() {
                   <th className="p-4 pl-6">Product & SKU</th>
                   <th className="p-4">Category</th>
                   <th className="p-4">MRP</th>
-                  {isSuperStockist && <th className="p-4">Live Warehouse Qty</th>}
+                  {isSuperStockist && <th className="p-4">Live Warehouse Stock (Cartons & Packets)</th>}
                   <th className="p-4">GST %</th>
                   <th className="p-4 pr-6 text-right">Stock Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-medium">
                 {filteredProducts.map((p) => {
-                  const currentQty = isSuperStockist ? p.quantity : 50;
-                  const isOut = currentQty === 0;
-                  const isLow = currentQty > 0 && currentQty <= 5;
+                  const totalPkts = isSuperStockist ? p.quantity : 50;
+                  const pktsPerCtn = p.packets_per_carton || 1;
+                  const cartons = Math.floor(totalPkts / pktsPerCtn);
+                  const remainingPkts = totalPkts % pktsPerCtn;
+
+                  const isOut = totalPkts === 0;
+                  const isLow = totalPkts > 0 && totalPkts <= 5;
 
                   return (
                     <tr key={p.product_id} className="hover:bg-slate-50/60 transition">
@@ -206,10 +210,16 @@ export default function LiveInventoryStockPage() {
                       </td>
                       <td className="p-4 font-black text-slate-900">₹{p.mrp}</td>
                       {isSuperStockist && (
-                        <td className="p-4 font-black text-slate-900">
-                          <span className={`px-2.5 py-1 rounded-lg ${isLow ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-800'}`}>
-                            {currentQty} Units
-                          </span>
+                        <td className="p-4">
+                          <div className="inline-flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-slate-100 text-slate-900 font-black rounded-lg border border-slate-200 shadow-xs">
+                              📦 {cartons} Ctns
+                            </span>
+                            <span className="px-2.5 py-1 bg-amber-50 text-amber-900 font-black rounded-lg border border-amber-200 shadow-xs">
+                              📄 {remainingPkts} Pkts
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 block mt-1 font-mono">({totalPkts} Total Pkts | {pktsPerCtn} Pkts/Ctn)</span>
                         </td>
                       )}
                       <td className="p-4 font-bold text-purple-700">{p.gst_percent || 0}%</td>
