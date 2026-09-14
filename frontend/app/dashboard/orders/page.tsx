@@ -106,35 +106,38 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const getTargetUserRole = () => {
-    if (orderMode === 'upstream') return 'admin';
+  // Determine if target role requires carton ordering (Super Stockists and Distributors order in cartons)
+  const getIsCartonOrder = () => {
+    if (orderMode === 'upstream') return true; // Super Stockist ordering upwards to admin always in cartons
     const targetUser = downlineUsers.find(u => String(u.id) === String(selectedTargetId));
-    return targetUser ? targetUser.role : 'shop';
+    if (!targetUser) return true;
+    return targetUser.role === 'super_stockist' || targetUser.role === 'distributor';
   };
 
   const getProductEffectivePrice = (product: any, unitType: 'carton' | 'packet') => {
-    const targetRole = getTargetUserRole();
+    const isCarton = unitType === 'carton';
     let basePrice = Number(product.mrp);
-
-    if (targetRole === 'super_stockist') basePrice = Number(product.super_stockist_price || product.mrp);
-    else if (targetRole === 'distributor') basePrice = Number(product.distributor_price || product.mrp);
-    else if (targetRole === 'shop') basePrice = Number(product.shop_price || product.mrp);
 
     const pricingMatch = partnerPricing.find((p) => p.product_id === product.id);
     if (pricingMatch && pricingMatch.custom_price !== null) {
       basePrice = Number(pricingMatch.custom_price);
+    } else {
+      const targetUser = downlineUsers.find(u => String(u.id) === String(selectedTargetId));
+      if (targetUser?.role === 'super_stockist') basePrice = Number(product.super_stockist_price || product.mrp);
+      else if (targetUser?.role === 'distributor') basePrice = Number(product.distributor_price || product.mrp);
+      else if (targetUser?.role === 'shop') basePrice = Number(product.shop_price || product.mrp);
     }
 
     const packetsPerCtn = Number(product.packets_per_carton || 1);
-    // If ordering in cartons, multiply packet unit price by packets per carton
-    return unitType === 'carton' ? basePrice * packetsPerCtn : basePrice;
+    // If carton ordering, multiply base packet price by packets per carton
+    return isCarton ? basePrice * packetsPerCtn : basePrice;
   };
 
   const handleUnitQuantityChange = (product: any, inputVal: number, unitType: 'carton' | 'packet') => {
     const count = Math.max(0, inputVal);
     const pktsPerCtn = Number(product.packets_per_carton || 1);
     
-    // Actual total packet quantity stored in DB
+    // Convert cartons to total packets for DB storage & inventory tracking
     const totalPackets = unitType === 'carton' ? count * pktsPerCtn : count;
     const unitPrice = getProductEffectivePrice(product, unitType);
 
@@ -494,8 +497,7 @@ export default function AdminOrdersPage() {
   });
 
   const isSuperStockist = currentUser?.role === 'super_stockist';
-  const targetRole = getTargetUserRole();
-  const isCartonOrderRole = targetRole === 'super_stockist' || targetRole === 'distributor';
+  const isCartonOrder = getIsCartonOrder();
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -759,7 +761,7 @@ export default function AdminOrdersPage() {
               <div>
                 <h3 className="text-lg font-black text-slate-900">{isSuperStockist ? 'Smart Order & Billing Hub' : 'Create Order for Downline Partner'}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isSuperStockist ? `Ordering Mode: ${isCartonOrderRole ? '📦 Cartons Rate & Units' : '📄 Packets Rate & Units'}` : 'Rates automatically apply per partner pricing structure.'}
+                  {isSuperStockist ? `Ordering Mode: ${isCartonOrder ? '📦 Cartons Rate & Units' : '📄 Packets Rate & Units'}` : 'Rates automatically apply per partner pricing structure.'}
                 </p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
@@ -829,7 +831,7 @@ export default function AdminOrdersPage() {
                 <div className="flex justify-between items-center">
                   <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
                   <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-3 py-1 rounded-lg uppercase">
-                    Ordering Unit: {isCartonOrderRole ? '📦 Cartons' : '📄 Packets'}
+                    Ordering Unit: {isCartonOrder ? '📦 Cartons' : '📄 Packets'}
                   </span>
                 </div>
 
@@ -863,10 +865,9 @@ export default function AdminOrdersPage() {
                   ) : (
                     filteredProducts.map((p) => {
                       const currentItem = orderItems.find(i => i.productId === p.id);
-                      const unitType = isCartonOrderRole ? 'carton' : 'packet';
+                      const unitType = isCartonOrder ? 'carton' : 'packet';
                       const pktsPerCtn = Number(p.packets_per_carton || 1);
                       
-                      // Calculate input box value (cartons count vs packets count)
                       const totalPkts = currentItem ? currentItem.quantity : 0;
                       const inputVal = unitType === 'carton' ? Math.floor(totalPkts / pktsPerCtn) : totalPkts;
                       const unitPrice = getProductEffectivePrice(p, unitType);
@@ -920,7 +921,7 @@ export default function AdminOrdersPage() {
                       <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
                         <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
                         <div className="flex items-center gap-3">
-                          <span className="text-slate-600 font-medium">{item.quantity} units ({item.unitType}) × ₹{item.unitPrice} = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
+                          <span className="text-slate-600 font-medium">{item.quantity} packets total ({item.unitType}) × ₹{item.unitPrice} = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
                           <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
