@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import API from '@/app/lib/api';
-import { Package, UserPlus, ShoppingCart, FileText, ArrowRight, Boxes, TrendingUp, Users, ShieldAlert, Sparkles, BarChart3 } from 'lucide-react';
+import { Package, UserPlus, ShoppingCart, FileText, ArrowRight, Boxes, TrendingUp, Users, ShieldAlert, Sparkles, BarChart3, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 
 interface FinancialOverview {
@@ -91,13 +91,13 @@ export default function DashboardOverviewPage() {
             </div>
           </Link>
         ) : (
-          <Link href="/dashboard/inventory/stocks" className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:border-amber-500/60 hover:shadow-md transition flex items-center gap-4 group cursor-pointer">
+          <Link href="/dashboard/pricing" className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:border-amber-500/60 hover:shadow-md transition flex items-center gap-4 group cursor-pointer">
             <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-500 group-hover:text-slate-950 transition shadow-inner">
-              <Boxes className="w-5 h-5" />
+              <DollarSign className="w-5 h-5" />
             </div>
             <div>
-              <h4 className="font-black text-xs text-slate-900">Stock Management</h4>
-              <p className="text-[10px] text-slate-400 font-medium">Update local inventory</p>
+              <h4 className="font-black text-xs text-slate-900">Downstream Pricing</h4>
+              <p className="text-[10px] text-slate-400 font-medium">Manage partner rate sheets</p>
             </div>
           </Link>
         )}
@@ -107,7 +107,7 @@ export default function DashboardOverviewPage() {
             <Boxes className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-black text-xs text-slate-900">Stock Control</h4>
+            <h4 className="font-black text-xs text-slate-900">Stock Management</h4>
             <p className="text-[10px] text-slate-400 font-medium">Live inventory feed</p>
           </div>
         </Link>
