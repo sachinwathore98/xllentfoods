@@ -14,9 +14,9 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const allNavItems = [
     { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
-    { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package, roles: ['superadmin', 'admin'] }, // Hidden for Super Stockist
+    { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package, roles: ['superadmin', 'admin'] },
     { name: 'Stock Management', href: '/dashboard/inventory/stocks', icon: Boxes, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
-    { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign, roles: ['superadmin', 'admin', 'super_stockist'] }, // Added super_stockist here
     { name: 'Partnership Enquiries', href: '/dashboard/enquiries', icon: Users, roles: ['superadmin', 'admin'] },
     { name: 'Smart Orders & Fulfillment', href: '/dashboard/orders', icon: ShoppingCart, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
     { name: 'Provision Shop / User', href: '/dashboard/users/create', icon: UserPlus, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'employee'] },
