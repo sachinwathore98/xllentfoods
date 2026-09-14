@@ -106,9 +106,8 @@ export default function AdminOrdersPage() {
     }
   };
 
-  // Determine if target role requires carton ordering (Super Stockists and Distributors order in cartons)
   const getIsCartonOrder = () => {
-    if (orderMode === 'upstream') return true; // Super Stockist ordering upwards to admin always in cartons
+    if (orderMode === 'upstream') return true;
     const targetUser = downlineUsers.find(u => String(u.id) === String(selectedTargetId));
     if (!targetUser) return true;
     return targetUser.role === 'super_stockist' || targetUser.role === 'distributor';
@@ -129,7 +128,6 @@ export default function AdminOrdersPage() {
     }
 
     const packetsPerCtn = Number(product.packets_per_carton || 1);
-    // If carton ordering, multiply base packet price by packets per carton
     return isCarton ? basePrice * packetsPerCtn : basePrice;
   };
 
@@ -137,7 +135,7 @@ export default function AdminOrdersPage() {
     const count = Math.max(0, inputVal);
     const pktsPerCtn = Number(product.packets_per_carton || 1);
     
-    // Convert cartons to total packets for DB storage & inventory tracking
+    // Explicit multiplication: Cartons * Packets Per Carton = Total Packets stored in DB
     const totalPackets = unitType === 'carton' ? count * pktsPerCtn : count;
     const unitPrice = getProductEffectivePrice(product, unitType);
 
@@ -831,7 +829,7 @@ export default function AdminOrdersPage() {
                 <div className="flex justify-between items-center">
                   <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
                   <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-3 py-1 rounded-lg uppercase">
-                    Ordering Unit: {isCartonOrder ? '📦 Cartons' : '📄 Packets'}
+                    Ordering Unit: {isCartonOrder ? '📦 Cartons (Multiplies by Pkts/Ctn)' : '📄 Packets'}
                   </span>
                 </div>
 
@@ -887,7 +885,7 @@ export default function AdminOrdersPage() {
                               <p className="text-[10px] text-slate-500">
                                 SKU: {p.sku || 'N/A'} | Rate ({unitType === 'carton' ? 'Per Carton' : 'Per Packet'}): <span className="font-bold text-slate-800">₹{unitPrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
                               </p>
-                              <p className="text-[9px] text-slate-400">Ratio: {pktsPerCtn} Pkts per Carton</p>
+                              <p className="text-[9px] text-amber-700 font-bold">📦 Ratio: {pktsPerCtn} Pkts per Carton (1 Ctn = {pktsPerCtn} Pkts added to stock)</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
@@ -921,7 +919,7 @@ export default function AdminOrdersPage() {
                       <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
                         <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
                         <div className="flex items-center gap-3">
-                          <span className="text-slate-600 font-medium">{item.quantity} packets total ({item.unitType}) × ₹{item.unitPrice} = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
+                          <span className="text-slate-600 font-medium">{item.quantity} total packets ({item.unitType === 'carton' ? `${item.quantity / (products.find(p=>p.id===item.productId)?.packets_per_carton || 1)} Ctns` : `${item.quantity} Pkts`}) × rate = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
                           <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
