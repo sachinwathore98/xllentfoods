@@ -31,7 +31,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       setUserRole(user.role);
 
       // --- STRICT ROLE-BASED ROUTE GUARDING ---
-      const adminOnlyPaths = ['/dashboard/enquiries', '/dashboard/pricing', '/dashboard/ads'];
+      const adminOnlyPaths = ['/dashboard/enquiries', '/dashboard/ads']; // Removed '/dashboard/pricing' so super_stockist can access it
       const shopOrEmployeeRestricted = ['/dashboard/inventory', '/dashboard/pricing', '/dashboard/enquiries', '/dashboard/ads'];
 
       if (['shop'].includes(user.role) && shopOrEmployeeRestricted.some(path => pathname?.startsWith(path))) {
@@ -42,7 +42,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         router.push('/dashboard/orders');
       }
 
-      if (['super_stockist', 'distributor'].includes(user.role) && adminOnlyPaths.some(path => pathname?.startsWith(path))) {
+      // Allow super_stockist and distributor to access pricing, restrict other admin-only paths
+      if (['distributor'].includes(user.role) && adminOnlyPaths.some(path => pathname?.startsWith(path))) {
         router.push('/dashboard/overview');
       }
 
