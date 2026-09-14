@@ -741,18 +741,49 @@ async function initPartnerInventories() {
 initPartnerInventories();
 
 // --- GET PARTNER LIVE INVENTORY ---
+// --- GET PARTNER LIVE INVENTORY (AGGREGATED LIVE FROM COMPLETED/APPROVED ORDERS) ---
 app.get('/api/partner/inventory/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    // Calculate live inbound stock from completed/approved orders where user is the buyer
+    // Minus outbound stock from completed/approved orders where user is the seller
     const result = await pool.query(`
       SELECT 
-        p.id as product_id, p.name, p.sku, p.category, p.mrp, p.gst_percent, p.image, p.pieces_per_packet, p.packets_per_carton,
-        COALESCE(pi.quantity, 0) as quantity,
-        COALESCE(pi.status, 'In Stock') as status
+        p.id as product_id, 
+        p.name, 
+        p.sku, 
+        p.category, 
+        p.mrp, 
+        p.gst_percent, 
+        p.image, 
+        p.pieces_per_packet, 
+        p.packets_per_carton,
+        COALESCE(base_inv.manual_qty, 0) + COALESCE(inbound.bought_qty, 0) - COALESCE(outbound.sold_qty, 0) as quantity,
+        CASE 
+          WHEN (COALESCE(base_inv.manual_qty, 0) + COALESCE(inbound.bought_qty, 0) - COALESCE(outbound.sold_qty, 0)) <= 0 THEN 'Out of Stock'
+          WHEN (COALESCE(base_inv.manual_qty, 0) + COALESCE(inbound.bought_qty, 0) - COALESCE(outbound.sold_qty, 0)) <= 5 THEN 'Low Stock'
+          ELSE 'In Stock'
+        END as status
       FROM products p
-      LEFT JOIN partner_inventories pi ON pi.product_id = p.id AND pi.user_id = $1
+      LEFT JOIN partner_inventories base_inv ON base_inv.product_id = p.id AND base_inv.user_id = $1
+      LEFT JOIN (
+        SELECT oi.product_id, SUM(oi.quantity) as bought_qty
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.buyer_id = $1 AND (o.status = 'Completed' OR o.status = 'Approved')
+        GROUP BY oi.product_id
+      ) inbound ON inbound.product_id = p.id
+      LEFT JOIN (
+        SELECT oi.product_id, SUM(oi.quantity) as sold_qty
+        FROM orders o
+        JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.seller_id = $1 AND (o.status = 'Completed' OR o.status = 'Approved')
+        GROUP BY oi.product_id
+      ) outbound ON outbound.product_id = p.id
       ORDER BY p.category, p.name ASC
     `, [userId]);
+
     res.json({ inventory: result.rows });
   } catch (err) {
     console.error('Fetch Partner Inventory Error:', err);

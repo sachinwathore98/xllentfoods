@@ -33,6 +33,13 @@ export default function LiveInventoryStockPage() {
       setCurrentUser(u);
       fetchData(u);
     }
+
+    const handleFocus = () => {
+      const stored = localStorage.getItem('user');
+      if (stored) fetchData(JSON.parse(stored));
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
   }, []);
 
   const fetchData = async (u: any) => {
