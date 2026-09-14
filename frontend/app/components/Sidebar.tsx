@@ -14,7 +14,7 @@ export default function Sidebar({ role }: SidebarProps) {
 
   const allNavItems = [
     { name: 'Overview', href: '/dashboard/overview', icon: LayoutDashboard, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
-    { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
+    { name: 'Inventory & Catalog', href: '/dashboard/inventory', icon: Package, roles: ['superadmin', 'admin'] }, // Hidden for Super Stockist
     { name: 'Stock Management', href: '/dashboard/inventory/stocks', icon: Boxes, roles: ['superadmin', 'admin', 'super_stockist', 'distributor', 'shop', 'employee'] },
     { name: 'Downstream Pricing', href: '/dashboard/pricing', icon: DollarSign, roles: ['superadmin', 'admin', 'super_stockist', 'distributor'] },
     { name: 'Partnership Enquiries', href: '/dashboard/enquiries', icon: Users, roles: ['superadmin', 'admin'] },

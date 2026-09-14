@@ -720,3 +720,62 @@ app.use((err, req, res, next) => {
 // --- SERVER LISTENER ---
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+
+// --- INITIALIZE PARTNER INVENTORIES TABLE ---
+async function initPartnerInventories() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS partner_inventories (
+        id SERIAL PRIMARY KEY,
+        user_id INT NOT NULL,
+        product_id INT NOT NULL,
+        quantity INT DEFAULT 0,
+        status VARCHAR(50) DEFAULT 'In Stock',
+        CONSTRAINT unique_user_product_stock UNIQUE (user_id, product_id)
+      );
+    `);
+  } catch (err) {
+    console.error('Error creating partner_inventories table:', err);
+  }
+}
+initPartnerInventories();
+
+// --- GET PARTNER LIVE INVENTORY ---
+app.get('/api/partner/inventory/:userId', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const result = await pool.query(`
+      SELECT 
+        p.id as product_id, p.name, p.sku, p.category, p.mrp, p.gst_percent, p.image, p.pieces_per_packet, p.packets_per_carton,
+        COALESCE(pi.quantity, 0) as quantity,
+        COALESCE(pi.status, 'In Stock') as status
+      FROM products p
+      LEFT JOIN partner_inventories pi ON pi.product_id = p.id AND pi.user_id = $1
+      ORDER BY p.category, p.name ASC
+    `, [userId]);
+    res.json({ inventory: result.rows });
+  } catch (err) {
+    console.error('Fetch Partner Inventory Error:', err);
+    res.status(500).json({ message: 'Failed to fetch partner inventory' });
+  }
+});
+
+// --- SET OR ADD PARTNER STOCK ---
+app.post('/api/partner/inventory/set', async (req, res) => {
+  try {
+    const { userId, productId, quantity, status } = req.body;
+    const updateRes = await pool.query(`
+      UPDATE partner_inventories SET quantity = $1, status = $2 WHERE user_id = $3 AND product_id = $4 RETURNING *
+    `, [quantity, status || 'In Stock', userId, productId]);
+
+    if (updateRes.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO partner_inventories (user_id, product_id, quantity, status) VALUES ($1, $2, $3, $4)
+      `, [userId, productId, quantity, status || 'In Stock']);
+    }
+    res.json({ success: true, message: 'Stock updated successfully' });
+  } catch (err) {
+    console.error('Set Partner Stock Error:', err);
+    res.status(500).json({ message: 'Failed to update stock' });
+  }
+});
