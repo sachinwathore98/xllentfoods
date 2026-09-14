@@ -23,7 +23,6 @@ export default function DownstreamPricingPage() {
       const role = storedUser.role;
 
       const res = await API.get(`/api/admin/downline-users?userId=${userId}&role=${role}`);
-      // Exclude the logged-in user themselves from appearing in their own downstream pricing dropdown
       const fetchedUsers = (res.data.users || []).filter((u: any) => u.id !== Number(userId));
       setUsers(fetchedUsers);
 
@@ -62,7 +61,7 @@ export default function DownstreamPricingPage() {
     );
   };
 
-  const handleSavePrice = async (productId: number, customPrice: number) => {
+  const handleSavePrice = async (productId: number, customPrice: any) => {
     try {
       await API.post('/api/downline-pricing/set-user-price', {
         userId: selectedUser.id,
@@ -111,7 +110,6 @@ export default function DownstreamPricingPage() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* Partner Selector Card */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
             <label className="text-xs font-extrabold uppercase text-slate-400 tracking-wider block mb-3">
               Select Partner Account
@@ -132,7 +130,6 @@ export default function DownstreamPricingPage() {
             </div>
           </div>
 
-          {/* Rate Sheet Table Card */}
           {selectedUser && (
             <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 border-b border-slate-100 pb-4">
@@ -157,36 +154,39 @@ export default function DownstreamPricingPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {pricing.map((item) => (
-                      <tr key={item.product_id} className="hover:bg-slate-50/50 transition">
-                        <td className="py-4">
-                          <p className="font-extrabold text-slate-900">{item.name}</p>
-                          <p className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</p>
-                        </td>
-                        <td className="py-4">
-                          <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase">
-                            {item.category}
-                          </span>
-                        </td>
-                        <td className="py-4 font-black text-slate-700">₹{item.mrp}</td>
-                        <td className="py-4">
-                          <input
-                            type="number"
-                            value={item.custom_price !== null && item.custom_price !== undefined ? item.custom_price : item.effective_price || 0}
-                            onChange={(e) => handlePriceChange(item.product_id, e.target.value)}
-                            className="w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
-                          />
-                        </td>
-                        <td className="py-4 text-right">
-                          <button
-                            onClick={() => handleSavePrice(item.product_id, item.custom_price !== undefined ? item.custom_price : item.effective_price)}
-                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
-                          >
-                            <Save className="w-3.5 h-3.5" /> Save Rate
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {pricing.map((item) => {
+                      const displayPrice = item.custom_price !== null && item.custom_price !== undefined ? item.custom_price : item.effective_price || 0;
+                      return (
+                        <tr key={item.product_id} className="hover:bg-slate-50/50 transition">
+                          <td className="py-4">
+                            <p className="font-extrabold text-slate-900">{item.name}</p>
+                            <p className="text-[10px] text-slate-400 font-mono">SKU: {item.sku}</p>
+                          </td>
+                          <td className="py-4">
+                            <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase">
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="py-4 font-black text-slate-700">₹{item.mrp}</td>
+                          <td className="py-4">
+                            <input
+                              type="number"
+                              value={displayPrice}
+                              onChange={(e) => handlePriceChange(item.product_id, e.target.value)}
+                              className="w-32 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:outline-none focus:border-amber-500"
+                            />
+                          </td>
+                          <td className="py-4 text-right">
+                            <button
+                              onClick={() => handleSavePrice(item.product_id, displayPrice)}
+                              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition inline-flex items-center gap-1.5 shadow-sm cursor-pointer"
+                            >
+                              <Save className="w-3.5 h-3.5" /> Save Rate
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

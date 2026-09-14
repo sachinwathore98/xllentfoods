@@ -17,8 +17,13 @@ export default function DashboardOverviewPage() {
   const [financials, setFinancials] = useState<FinancialOverview | null>(null);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      setCurrentUser(JSON.parse(userStr));
+    }
     fetchData();
   }, []);
 
@@ -32,7 +37,6 @@ export default function DashboardOverviewPage() {
       setFinancials(overviewRes.data.overview);
       
       const items = productsRes.data.products || [];
-      // Filter items flagged or low stock simulation
       setLowStockProducts(items.filter((p: any) => p.status === 'Out of Stock' || p.status === 'Low Stock' || Math.random() < 0.15));
     } catch (err) {
       console.error('Error fetching overview analytics:', err);
@@ -40,6 +44,8 @@ export default function DashboardOverviewPage() {
       setLoading(false);
     }
   };
+
+  const isSuperStockist = currentUser?.role === 'super_stockist';
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10 text-slate-800 bg-slate-50/50 min-h-screen">
@@ -74,15 +80,27 @@ export default function DashboardOverviewPage() {
 
       {/* Quick Action Toolbar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <Link href="/dashboard/inventory" className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:border-amber-500/60 hover:shadow-md transition flex items-center gap-4 group cursor-pointer">
-          <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-500 group-hover:text-slate-950 transition shadow-inner">
-            <Package className="w-5 h-5" />
-          </div>
-          <div>
-            <h4 className="font-black text-xs text-slate-900">Manage Catalog</h4>
-            <p className="text-[10px] text-slate-400 font-medium">Add or edit products</p>
-          </div>
-        </Link>
+        {!isSuperStockist ? (
+          <Link href="/dashboard/inventory" className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:border-amber-500/60 hover:shadow-md transition flex items-center gap-4 group cursor-pointer">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-500 group-hover:text-slate-950 transition shadow-inner">
+              <Package className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-black text-xs text-slate-900">Manage Catalog</h4>
+              <p className="text-[10px] text-slate-400 font-medium">Add or edit products</p>
+            </div>
+          </Link>
+        ) : (
+          <Link href="/dashboard/inventory/stocks" className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:border-amber-500/60 hover:shadow-md transition flex items-center gap-4 group cursor-pointer">
+            <div className="p-3 bg-amber-50 text-amber-600 rounded-2xl group-hover:bg-amber-500 group-hover:text-slate-950 transition shadow-inner">
+              <Boxes className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="font-black text-xs text-slate-900">Stock Management</h4>
+              <p className="text-[10px] text-slate-400 font-medium">Update local inventory</p>
+            </div>
+          </Link>
+        )}
 
         <Link href="/dashboard/inventory/stocks" className="p-5 bg-white border border-slate-200/80 rounded-3xl shadow-sm hover:border-amber-500/60 hover:shadow-md transition flex items-center gap-4 group cursor-pointer">
           <div className="p-3 bg-indigo-50 text-indigo-600 rounded-2xl group-hover:bg-indigo-600 group-hover:text-white transition shadow-inner">
@@ -137,7 +155,11 @@ export default function DashboardOverviewPage() {
             </div>
             <div className="pt-4 border-t border-slate-100 flex justify-between items-center text-xs">
               <span className="font-bold text-slate-600">{financials.totalProducts} Total SKUs</span>
-              <Link href="/dashboard/inventory" className="text-amber-600 font-black hover:underline flex items-center gap-1">Catalog <ArrowRight className="w-3 h-3" /></Link>
+              {!isSuperStockist ? (
+                <Link href="/dashboard/inventory" className="text-amber-600 font-black hover:underline flex items-center gap-1">Catalog <ArrowRight className="w-3 h-3" /></Link>
+              ) : (
+                <Link href="/dashboard/inventory/stocks" className="text-amber-600 font-black hover:underline flex items-center gap-1">Stock <ArrowRight className="w-3 h-3" /></Link>
+              )}
             </div>
           </div>
 
@@ -182,13 +204,11 @@ export default function DashboardOverviewPage() {
             <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-black text-[10px] uppercase rounded-full border border-emerald-200">Live Sync</span>
           </div>
 
-          {/* Graphical representation using SVG */}
           <div className="h-64 w-full bg-slate-50 rounded-2xl p-4 flex flex-col justify-end border border-slate-100 relative overflow-hidden">
             <div className="absolute inset-0 flex items-center justify-center opacity-5 pointer-events-none">
               <BarChart3 className="w-48 h-48 text-slate-900" />
             </div>
             
-            {/* SVG Bars */}
             <svg className="w-full h-44 overflow-visible" viewBox="0 0 600 150">
               <defs>
                 <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
@@ -202,7 +222,6 @@ export default function DashboardOverviewPage() {
                 <line x1="0" y1="100" x2="600" y2="100" />
                 <line x1="0" y1="150" x2="600" y2="150" />
               </g>
-              {/* Bars */}
               <rect x="40" y="40" width="45" height="110" rx="8" fill="url(#barGrad)" />
               <rect x="120" y="25" width="45" height="125" rx="8" fill="url(#barGrad)" />
               <rect x="200" y="60" width="45" height="90" rx="8" fill="url(#barGrad)" />
