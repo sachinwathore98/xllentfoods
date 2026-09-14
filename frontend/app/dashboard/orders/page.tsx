@@ -25,7 +25,7 @@ export default function AdminOrdersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTargetId, setSelectedTargetId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; sku?: string; category: string; quantity: number; unitPrice: number; gstPercent: number }[]>([]);
+  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; sku?: string; category: string; quantity: number; unitPrice: number; gstPercent: number; unitType: 'carton' | 'packet' }[]>([]);
   
   // Edit Order State
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
@@ -106,35 +106,55 @@ export default function AdminOrdersPage() {
     }
   };
 
-  const getProductEffectivePrice = (productId: number) => {
-    const pricingMatch = partnerPricing.find((p) => p.product_id === productId);
-    if (pricingMatch) {
-      return Number(pricingMatch.effective_price || pricingMatch.mrp || 0);
-    }
-    const prod = products.find((p) => p.id === productId);
-    return prod ? Number(prod.mrp) : 0;
+  const getTargetUserRole = () => {
+    if (orderMode === 'upstream') return 'admin';
+    const targetUser = downlineUsers.find(u => String(u.id) === String(selectedTargetId));
+    return targetUser ? targetUser.role : 'shop';
   };
 
-  const handleQuantityChange = (product: any, qty: number) => {
-    const quantity = Math.max(0, qty);
-    const unitPrice = getProductEffectivePrice(product.id);
+  const getProductEffectivePrice = (product: any, unitType: 'carton' | 'packet') => {
+    const targetRole = getTargetUserRole();
+    let basePrice = Number(product.mrp);
+
+    if (targetRole === 'super_stockist') basePrice = Number(product.super_stockist_price || product.mrp);
+    else if (targetRole === 'distributor') basePrice = Number(product.distributor_price || product.mrp);
+    else if (targetRole === 'shop') basePrice = Number(product.shop_price || product.mrp);
+
+    const pricingMatch = partnerPricing.find((p) => p.product_id === product.id);
+    if (pricingMatch && pricingMatch.custom_price !== null) {
+      basePrice = Number(pricingMatch.custom_price);
+    }
+
+    const packetsPerCtn = Number(product.packets_per_carton || 1);
+    // If ordering in cartons, multiply packet unit price by packets per carton
+    return unitType === 'carton' ? basePrice * packetsPerCtn : basePrice;
+  };
+
+  const handleUnitQuantityChange = (product: any, inputVal: number, unitType: 'carton' | 'packet') => {
+    const count = Math.max(0, inputVal);
+    const pktsPerCtn = Number(product.packets_per_carton || 1);
+    
+    // Actual total packet quantity stored in DB
+    const totalPackets = unitType === 'carton' ? count * pktsPerCtn : count;
+    const unitPrice = getProductEffectivePrice(product, unitType);
 
     setOrderItems((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
-      if (quantity === 0) {
+      if (totalPackets === 0) {
         return prev.filter((item) => item.productId !== product.id);
       }
       if (existing) {
-        return prev.map((item) => item.productId === product.id ? { ...item, quantity, unitPrice } : item);
+        return prev.map((item) => item.productId === product.id ? { ...item, quantity: totalPackets, unitPrice, unitType } : item);
       } else {
         return [...prev, { 
           productId: product.id, 
           name: product.name, 
           sku: product.sku || 'N/A',
           category: product.category, 
-          quantity, 
+          quantity: totalPackets, 
           unitPrice, 
-          gstPercent: Number(product.gst_percent || 0) 
+          gstPercent: Number(product.gst_percent || 0),
+          unitType
         }];
       }
     });
@@ -217,8 +237,8 @@ export default function AdminOrdersPage() {
 
   const handleEditItemQuantity = (productId: number, qty: number) => {
     const quantity = Math.max(0, qty);
-    const unitPrice = getProductEffectivePrice(productId);
     const prod = products.find(p => p.id === productId);
+    const unitPrice = prod ? Number(prod.mrp) : 0;
 
     setEditItems((prev) => {
       const existing = prev.find((item) => item.productId === productId);
@@ -394,7 +414,7 @@ export default function AdminOrdersPage() {
       pdf.setTextColor(71, 85, 105);
       pdf.text('PRODUCT NAME & SKU', 20, startY + 5.5);
       pdf.text('QTY', 110, startY + 5.5, { align: 'right' });
-      pdf.text('PRICE/PC', 135, startY + 5.5, { align: 'right' });
+      pdf.text('PRICE/UNIT', 135, startY + 5.5, { align: 'right' });
       pdf.text('GST%', 160, startY + 5.5, { align: 'right' });
       pdf.text('TOTAL', 190, startY + 5.5, { align: 'right' });
 
@@ -408,13 +428,13 @@ export default function AdminOrdersPage() {
       itemsList.forEach((item: any, idx: number) => {
         const itemY = startY + (idx * 9);
         const qty = item.quantity || 1;
-        const pricePerPc = item.unit_price || item.unitPrice || 0;
+        const pricePerUnit = item.unit_price || item.unitPrice || 0;
         const gst = item.gst_percent || item.gstPercent || 0;
-        const lineTotal = qty * pricePerPc * (1 + gst / 100);
+        const lineTotal = qty * pricePerUnit * (1 + gst / 100);
 
         pdf.text(`${item.name || 'Product'} [SKU: ${item.sku || 'N/A'}]`, 20, itemY);
         pdf.text(String(qty), 110, itemY, { align: 'right' });
-        pdf.text(`Rs. ${Number(pricePerPc).toFixed(2)}`, 135, itemY, { align: 'right' });
+        pdf.text(`Rs. ${Number(pricePerUnit).toFixed(2)}`, 135, itemY, { align: 'right' });
         pdf.text(`${gst}%`, 160, itemY, { align: 'right' });
         pdf.setFont('helvetica', 'bold');
         pdf.text(`Rs. ${lineTotal.toFixed(2)}`, 190, itemY, { align: 'right' });
@@ -474,6 +494,8 @@ export default function AdminOrdersPage() {
   });
 
   const isSuperStockist = currentUser?.role === 'super_stockist';
+  const targetRole = getTargetUserRole();
+  const isCartonOrderRole = targetRole === 'super_stockist' || targetRole === 'distributor';
 
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -536,7 +558,6 @@ export default function AdminOrdersPage() {
           <div className="text-center py-24 space-y-3">
             <ShoppingCart className="w-12 h-12 text-slate-300 mx-auto" />
             <p className="text-slate-600 text-xs font-bold">No orders found matching your search or filter.</p>
-            <p className="text-slate-400 text-[11px]">Try searching with a different term or clear the status filter.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -664,7 +685,7 @@ export default function AdminOrdersPage() {
                     editFilteredProducts.map((p) => {
                       const currentItem = editItems.find(i => i.productId === p.id);
                       const qty = currentItem ? currentItem.quantity : 0;
-                      const effectivePrice = getProductEffectivePrice(p.id);
+                      const effectivePrice = Number(p.mrp);
                       return (
                         <div key={p.id} className="flex items-center justify-between py-3 px-3 hover:bg-white rounded-2xl transition gap-4">
                           <div className="flex items-center gap-3.5">
@@ -738,7 +759,7 @@ export default function AdminOrdersPage() {
               <div>
                 <h3 className="text-lg font-black text-slate-900">{isSuperStockist ? 'Smart Order & Billing Hub' : 'Create Order for Downline Partner'}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isSuperStockist ? 'Choose between upstream replenishment or downstream invoicing.' : 'Rates automatically apply per partner pricing structure (Packet/Carton & GST).'}
+                  {isSuperStockist ? `Ordering Mode: ${isCartonOrderRole ? '📦 Cartons Rate & Units' : '📄 Packets Rate & Units'}` : 'Rates automatically apply per partner pricing structure.'}
                 </p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
@@ -759,7 +780,7 @@ export default function AdminOrdersPage() {
                     </div>
                     <div>
                       <h4 className="font-black text-xs">1. Order from Uplink (Admin / Super Admin)</h4>
-                      <p className={`text-[9px] mt-0.5 ${orderMode === 'upstream' ? 'text-slate-300' : 'text-slate-500'}`}>Replenish warehouse stock upwards</p>
+                      <p className={`text-[9px] mt-0.5 ${orderMode === 'upstream' ? 'text-slate-300' : 'text-slate-500'}`}>Replenish warehouse stock in Cartons</p>
                     </div>
                   </button>
 
@@ -775,7 +796,7 @@ export default function AdminOrdersPage() {
                     </div>
                     <div>
                       <h4 className="font-black text-xs">2. Fulfill Downstream & Bill</h4>
-                      <p className={`text-[9px] mt-0.5 ${orderMode === 'downstream' ? 'text-slate-300' : 'text-slate-500'}`}>Create invoice for Distributors or Shops</p>
+                      <p className={`text-[9px] mt-0.5 ${orderMode === 'downstream' ? 'text-slate-300' : 'text-slate-500'}`}>Cartons for Distributors, Packets for Shops</p>
                     </div>
                   </button>
                 </div>
@@ -805,7 +826,13 @@ export default function AdminOrdersPage() {
               </div>
 
               <div className="space-y-3">
-                <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
+                <div className="flex justify-between items-center">
+                  <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
+                  <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-3 py-1 rounded-lg uppercase">
+                    Ordering Unit: {isCartonOrderRole ? '📦 Cartons' : '📄 Packets'}
+                  </span>
+                </div>
+
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -836,8 +863,14 @@ export default function AdminOrdersPage() {
                   ) : (
                     filteredProducts.map((p) => {
                       const currentItem = orderItems.find(i => i.productId === p.id);
-                      const qty = currentItem ? currentItem.quantity : 0;
-                      const effectivePrice = getProductEffectivePrice(p.id);
+                      const unitType = isCartonOrderRole ? 'carton' : 'packet';
+                      const pktsPerCtn = Number(p.packets_per_carton || 1);
+                      
+                      // Calculate input box value (cartons count vs packets count)
+                      const totalPkts = currentItem ? currentItem.quantity : 0;
+                      const inputVal = unitType === 'carton' ? Math.floor(totalPkts / pktsPerCtn) : totalPkts;
+                      const unitPrice = getProductEffectivePrice(p, unitType);
+
                       return (
                         <div key={p.id} className="flex items-center justify-between py-3 px-3 hover:bg-white rounded-2xl transition gap-4">
                           <div className="flex items-center gap-3.5">
@@ -851,17 +884,18 @@ export default function AdminOrdersPage() {
                             <div>
                               <p className="text-xs font-black text-slate-900">{p.name}</p>
                               <p className="text-[10px] text-slate-500">
-                                SKU: {p.sku || 'N/A'} | Rate: <span className="font-bold text-slate-800">₹{effectivePrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
+                                SKU: {p.sku || 'N/A'} | Rate ({unitType === 'carton' ? 'Per Carton' : 'Per Packet'}): <span className="font-bold text-slate-800">₹{unitPrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
                               </p>
+                              <p className="text-[9px] text-slate-400">Ratio: {pktsPerCtn} Pkts per Carton</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">Qty:</span>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">{unitType === 'carton' ? 'Cartons:' : 'Packets:'}</span>
                             <input
                               type="number"
                               min="0"
-                              value={qty}
-                              onChange={(e) => handleQuantityChange(p, Number(e.target.value))}
+                              value={inputVal}
+                              onChange={(e) => handleUnitQuantityChange(p, Number(e.target.value), unitType)}
                               className="w-20 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
                             />
                           </div>
@@ -886,7 +920,7 @@ export default function AdminOrdersPage() {
                       <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
                         <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
                         <div className="flex items-center gap-3">
-                          <span className="text-slate-600 font-medium">{item.quantity} × ₹{item.unitPrice} (+{item.gstPercent}% GST) = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
+                          <span className="text-slate-600 font-medium">{item.quantity} units ({item.unitType}) × ₹{item.unitPrice} = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
                           <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
                         </div>
                       </div>
