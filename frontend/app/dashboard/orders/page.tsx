@@ -25,7 +25,7 @@ export default function AdminOrdersPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedTargetId, setSelectedTargetId] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; sku?: string; category: string; quantity: number; unitPrice: number; gstPercent: number; unitType: 'carton' | 'packet' }[]>([]);
+  const [orderItems, setOrderItems] = useState<{ productId: number; name: string; sku?: string; category: string; quantity: number; unitPrice: number; gstPercent: number; cartonsInput: number; packetsInput: number }[]>([]);
   
   // Edit Order State
   const [editingOrder, setEditingOrder] = useState<any | null>(null);
@@ -113,10 +113,8 @@ export default function AdminOrdersPage() {
     return targetUser.role === 'super_stockist' || targetUser.role === 'distributor';
   };
 
-  const getProductEffectivePrice = (product: any, unitType: 'carton' | 'packet') => {
-    const isCarton = unitType === 'carton';
+  const getProductPacketUnitPrice = (product: any) => {
     let basePrice = Number(product.mrp);
-
     const pricingMatch = partnerPricing.find((p) => p.product_id === product.id);
     if (pricingMatch && pricingMatch.custom_price !== null) {
       basePrice = Number(pricingMatch.custom_price);
@@ -126,18 +124,17 @@ export default function AdminOrdersPage() {
       else if (targetUser?.role === 'distributor') basePrice = Number(product.distributor_price || product.mrp);
       else if (targetUser?.role === 'shop') basePrice = Number(product.shop_price || product.mrp);
     }
-
-    const packetsPerCtn = Number(product.packets_per_carton || 1);
-    return isCarton ? basePrice * packetsPerCtn : basePrice;
+    return basePrice;
   };
 
-  const handleUnitQuantityChange = (product: any, inputVal: number, unitType: 'carton' | 'packet') => {
-    const count = Math.max(0, inputVal);
+  const handleSplitQuantityChange = (product: any, cartonsVal: number, packetsVal: number, isCartonRole: boolean) => {
+    const ctns = Math.max(0, cartonsVal);
+    const pkts = Math.max(0, packetsVal);
     const pktsPerCtn = Number(product.packets_per_carton || 1);
-    
-    // Explicit multiplication: Cartons * Packets Per Carton = Total Packets stored in DB
-    const totalPackets = unitType === 'carton' ? count * pktsPerCtn : count;
-    const unitPrice = getProductEffectivePrice(product, unitType);
+
+    // Total packets = (Cartons * PktsPerCtn) + Packets
+    const totalPackets = isCartonRole ? (ctns * pktsPerCtn) + pkts : pkts;
+    const packetUnitPrice = getProductPacketUnitPrice(product);
 
     setOrderItems((prev) => {
       const existing = prev.find((item) => item.productId === product.id);
@@ -145,7 +142,13 @@ export default function AdminOrdersPage() {
         return prev.filter((item) => item.productId !== product.id);
       }
       if (existing) {
-        return prev.map((item) => item.productId === product.id ? { ...item, quantity: totalPackets, unitPrice, unitType } : item);
+        return prev.map((item) => item.productId === product.id ? { 
+          ...item, 
+          quantity: totalPackets, 
+          unitPrice: packetUnitPrice, 
+          cartonsInput: ctns, 
+          packetsInput: pkts 
+        } : item);
       } else {
         return [...prev, { 
           productId: product.id, 
@@ -153,9 +156,10 @@ export default function AdminOrdersPage() {
           sku: product.sku || 'N/A',
           category: product.category, 
           quantity: totalPackets, 
-          unitPrice, 
+          unitPrice: packetUnitPrice, 
           gstPercent: Number(product.gst_percent || 0),
-          unitType
+          cartonsInput: ctns,
+          packetsInput: pkts
         }];
       }
     });
@@ -414,8 +418,8 @@ export default function AdminOrdersPage() {
       pdf.setFontSize(8);
       pdf.setTextColor(71, 85, 105);
       pdf.text('PRODUCT NAME & SKU', 20, startY + 5.5);
-      pdf.text('QTY', 110, startY + 5.5, { align: 'right' });
-      pdf.text('PRICE/UNIT', 135, startY + 5.5, { align: 'right' });
+      pdf.text('QTY (PKTS)', 110, startY + 5.5, { align: 'right' });
+      pdf.text('PRICE/PKT', 135, startY + 5.5, { align: 'right' });
       pdf.text('GST%', 160, startY + 5.5, { align: 'right' });
       pdf.text('TOTAL', 190, startY + 5.5, { align: 'right' });
 
@@ -759,7 +763,7 @@ export default function AdminOrdersPage() {
               <div>
                 <h3 className="text-lg font-black text-slate-900">{isSuperStockist ? 'Smart Order & Billing Hub' : 'Create Order for Downline Partner'}</h3>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {isSuperStockist ? `Ordering Mode: ${isCartonOrder ? '📦 Cartons Rate & Units' : '📄 Packets Rate & Units'}` : 'Rates automatically apply per partner pricing structure.'}
+                  {isSuperStockist ? `Ordering Mode: ${isCartonOrder ? '📦 Cartons & Packets' : '📄 Packets Only'}` : 'Rates automatically apply per partner pricing structure.'}
                 </p>
               </div>
               <button onClick={() => setIsCreateModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1.5 rounded-xl bg-slate-50 cursor-pointer"><X className="w-5 h-5" /></button>
@@ -780,7 +784,7 @@ export default function AdminOrdersPage() {
                     </div>
                     <div>
                       <h4 className="font-black text-xs">1. Order from Uplink (Admin / Super Admin)</h4>
-                      <p className={`text-[9px] mt-0.5 ${orderMode === 'upstream' ? 'text-slate-300' : 'text-slate-500'}`}>Replenish warehouse stock in Cartons</p>
+                      <p className={`text-[9px] mt-0.5 ${orderMode === 'upstream' ? 'text-slate-300' : 'text-slate-500'}`}>Replenish warehouse stock in Cartons & Packets</p>
                     </div>
                   </button>
 
@@ -796,7 +800,7 @@ export default function AdminOrdersPage() {
                     </div>
                     <div>
                       <h4 className="font-black text-xs">2. Fulfill Downstream & Bill</h4>
-                      <p className={`text-[9px] mt-0.5 ${orderMode === 'downstream' ? 'text-slate-300' : 'text-slate-500'}`}>Cartons for Distributors, Packets for Shops</p>
+                      <p className={`text-[9px] mt-0.5 ${orderMode === 'downstream' ? 'text-slate-300' : 'text-slate-500'}`}>Cartons & Packets for Distributors, Packets for Shops</p>
                     </div>
                   </button>
                 </div>
@@ -829,7 +833,7 @@ export default function AdminOrdersPage() {
                 <div className="flex justify-between items-center">
                   <label className="block text-[11px] font-extrabold text-slate-600 uppercase tracking-wider">Product Catalog & Categories</label>
                   <span className="text-[10px] font-black bg-amber-100 text-amber-900 px-3 py-1 rounded-lg uppercase">
-                    Ordering Unit: {isCartonOrder ? '📦 Cartons (Multiplies by Pkts/Ctn)' : '📄 Packets'}
+                    Ordering Unit: {isCartonOrder ? '📦 Cartons & 📄 Packets' : '📄 Packets Only'}
                   </span>
                 </div>
 
@@ -863,12 +867,13 @@ export default function AdminOrdersPage() {
                   ) : (
                     filteredProducts.map((p) => {
                       const currentItem = orderItems.find(i => i.productId === p.id);
-                      const unitType = isCartonOrder ? 'carton' : 'packet';
                       const pktsPerCtn = Number(p.packets_per_carton || 1);
                       
                       const totalPkts = currentItem ? currentItem.quantity : 0;
-                      const inputVal = unitType === 'carton' ? Math.floor(totalPkts / pktsPerCtn) : totalPkts;
-                      const unitPrice = getProductEffectivePrice(p, unitType);
+                      const ctnVal = isCartonOrder ? Math.floor(totalPkts / pktsPerCtn) : 0;
+                      const pktVal = isCartonOrder ? totalPkts % pktsPerCtn : totalPkts;
+                      
+                      const unitPrice = getProductPacketUnitPrice(p);
 
                       return (
                         <div key={p.id} className="flex items-center justify-between py-3 px-3 hover:bg-white rounded-2xl transition gap-4">
@@ -883,20 +888,35 @@ export default function AdminOrdersPage() {
                             <div>
                               <p className="text-xs font-black text-slate-900">{p.name}</p>
                               <p className="text-[10px] text-slate-500">
-                                SKU: {p.sku || 'N/A'} | Rate ({unitType === 'carton' ? 'Per Carton' : 'Per Packet'}): <span className="font-bold text-slate-800">₹{unitPrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
+                                SKU: {p.sku || 'N/A'} | Rate (Per Pkt): <span className="font-bold text-slate-800">₹{unitPrice}</span> | GST: <span className="text-amber-600 font-bold">{p.gst_percent || 0}%</span>
                               </p>
-                              <p className="text-[9px] text-amber-700 font-bold">📦 Ratio: {pktsPerCtn} Pkts per Carton (1 Ctn = {pktsPerCtn} Pkts added to stock)</p>
+                              <p className="text-[9px] text-amber-700 font-bold">📦 Ratio: {pktsPerCtn} Pkts per Carton</p>
                             </div>
                           </div>
+                          
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold text-slate-400 uppercase">{unitType === 'carton' ? 'Cartons:' : 'Packets:'}</span>
-                            <input
-                              type="number"
-                              min="0"
-                              value={inputVal}
-                              onChange={(e) => handleUnitQuantityChange(p, Number(e.target.value), unitType)}
-                              className="w-20 bg-white border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
-                            />
+                            {isCartonOrder && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">Ctns:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={ctnVal}
+                                  onChange={(e) => handleSplitQuantityChange(p, Number(e.target.value), pktVal, true)}
+                                  className="w-16 bg-white border border-slate-300 rounded-xl px-2 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
+                                />
+                              </div>
+                            )}
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] font-bold text-slate-400 uppercase">Pkts:</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={pktVal}
+                                onChange={(e) => handleSplitQuantityChange(p, ctnVal, Number(e.target.value), isCartonOrder)}
+                                className="w-16 bg-white border border-slate-300 rounded-xl px-2 py-1.5 text-xs font-black text-slate-900 text-center focus:outline-none focus:border-amber-500 shadow-sm"
+                              />
+                            </div>
                           </div>
                         </div>
                       );
@@ -915,15 +935,22 @@ export default function AdminOrdersPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                    {orderItems.map((item) => (
-                      <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
-                        <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-slate-600 font-medium">{item.quantity} total packets ({item.unitType === 'carton' ? `${item.quantity / (products.find(p=>p.id===item.productId)?.packets_per_carton || 1)} Ctns` : `${item.quantity} Pkts`}) × rate = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
-                          <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                    {orderItems.map((item) => {
+                      const prod = products.find(p => p.id === item.productId);
+                      const pktsPerCtn = Number(prod?.packets_per_carton || 1);
+                      const ctns = Math.floor(item.quantity / pktsPerCtn);
+                      const pkts = item.quantity % pktsPerCtn;
+
+                      return (
+                        <div key={item.productId} className="flex justify-between items-center text-xs bg-white p-2.5 rounded-xl border border-amber-100 shadow-sm">
+                          <span className="font-bold text-slate-900">{item.name} <span className="text-[10px] text-slate-500">({item.sku})</span></span>
+                          <div className="flex items-center gap-3">
+                            <span className="text-slate-600 font-medium">{ctns} Ctns & {pkts} Pkts ({item.quantity} total Pkts) = <strong className="text-slate-900">₹{(item.quantity * item.unitPrice * (1 + item.gstPercent/100)).toFixed(2)}</strong></span>
+                            <button type="button" onClick={() => handleRemoveItem(item.productId)} className="text-rose-500 hover:text-rose-700 p-1 cursor-pointer"><Trash2 className="w-3.5 h-3.5" /></button>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
