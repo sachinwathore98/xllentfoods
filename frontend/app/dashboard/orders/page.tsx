@@ -66,10 +66,7 @@ export default function AdminOrdersPage() {
       const res = await API.get(`/api/admin/downline-users?userId=${userId}&role=${role}`);
       const allUsers = res.data.users || [];
       
-      // Downstream partners (Distributors, Shops, Employees)
       setDownlineUsers(allUsers.filter((u: any) => u.id !== Number(userId)));
-
-      // Upstream vendors (Admins / Superadmins)
       const upVendors = allUsers.filter((u: any) => u.role === 'admin' || u.role === 'superadmin' || u.role === 'superadmin@xllentfoods.com');
       setUpstreamVendors(upVendors.length > 0 ? upVendors : [{ id: 1, name: 'Xllent Foods Central Admin', role: 'admin' }]);
     } catch (err) {
@@ -380,14 +377,14 @@ export default function AdminOrdersPage() {
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(10);
       pdf.setTextColor(15, 23, 42);
-      pdf.text(invoiceOrder.seller_name || 'Xllent Foods Central Hub', 110, 79);
+      pdf.text('Xllent Foods', 110, 79);
 
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(8.5);
       pdf.setTextColor(71, 85, 105);
-      pdf.text(`Email: support@xllentfoods.com`, 110, 85);
-      pdf.text(`Network Role: ${(invoiceOrder.seller_role || 'Admin').toUpperCase()}`, 110, 91);
-      pdf.text(`Support Phone: +91 99999 99999`, 110, 97);
+      pdf.text(`Email: xllentfoods91@gmail.com`, 110, 85);
+      pdf.text(`Support Phone: +91 73878 77820`, 110, 91);
+      pdf.text(`Network Role: ADMIN`, 110, 97);
 
       let startY = 122;
       pdf.setFillColor(241, 245, 249);
@@ -733,7 +730,7 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Create Order Modal with Super Stockist Dual Workflow */}
+      {/* Create Order Modal */}
       {isCreateModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white border border-slate-200 rounded-3xl w-full max-w-4xl p-6 md:p-8 space-y-6 shadow-2xl my-8">
@@ -748,7 +745,6 @@ export default function AdminOrdersPage() {
             </div>
 
             <form onSubmit={handleCreateOrder} className="space-y-6">
-              {/* Dual Mode Switcher for Super Stockist */}
               {isSuperStockist && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <button
